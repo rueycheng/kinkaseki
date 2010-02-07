@@ -1,0 +1,15 @@
+bin_PROGRAMS = gii_parse gii_tokenize gii_model1 gii_model2 sim
+gii_parse_SOURCES = gii_parse.cpp magicbox.h expatpp.h expatpp_callback.h gii_parse.h
+gii_tokenize_SOURCES = gii_tokenize.cpp porter.c porter.h magicbox.h gii_tokenize.h
+gii_model1_SOURCES = gii_model1.cpp magicbox.h porter.h porter.c
+gii_model2_SOURCES = gii_model2.cpp magicbox.h porter.h porter.c
+sim_SOURCES = sim.cpp magicbox.h
+
+AM_LDFLAGS = -lboost_program_options-mt -lboost_filesystem-mt -lexpat
+AM_CXXFLAGS = -Wall
+
+if USE_CXX0X
+    AM_CXXFLAGS += -std=c++0x
+endif
+
+INCLUDES = -I@topdir@
