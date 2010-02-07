@@ -31,7 +31,8 @@ NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
 bin_PROGRAMS = gii_parse$(EXEEXT) gii_tokenize$(EXEEXT) \
-	gii_model1$(EXEEXT) gii_model2$(EXEEXT) sim$(EXEEXT)
+	gii_model1$(EXEEXT) gii_model2$(EXEEXT) sim$(EXEEXT) \
+	lda$(EXEEXT)
 @USE_CXX0X_TRUE@am__append_1 = -std=c++0x
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
@@ -58,6 +59,9 @@ gii_parse_LDADD = $(LDADD)
 am_gii_tokenize_OBJECTS = gii_tokenize.$(OBJEXT) porter.$(OBJEXT)
 gii_tokenize_OBJECTS = $(am_gii_tokenize_OBJECTS)
 gii_tokenize_LDADD = $(LDADD)
+am_lda_OBJECTS = lda.$(OBJEXT)
+lda_OBJECTS = $(am_lda_OBJECTS)
+lda_LDADD = $(LDADD)
 am_sim_OBJECTS = sim.$(OBJEXT)
 sim_OBJECTS = $(am_sim_OBJECTS)
 sim_LDADD = $(LDADD)
@@ -74,9 +78,11 @@ CXXLD = $(CXX)
 CXXLINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
 	-o $@
 SOURCES = $(gii_model1_SOURCES) $(gii_model2_SOURCES) \
-	$(gii_parse_SOURCES) $(gii_tokenize_SOURCES) $(sim_SOURCES)
+	$(gii_parse_SOURCES) $(gii_tokenize_SOURCES) $(lda_SOURCES) \
+	$(sim_SOURCES)
 DIST_SOURCES = $(gii_model1_SOURCES) $(gii_model2_SOURCES) \
-	$(gii_parse_SOURCES) $(gii_tokenize_SOURCES) $(sim_SOURCES)
+	$(gii_parse_SOURCES) $(gii_tokenize_SOURCES) $(lda_SOURCES) \
+	$(sim_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -174,6 +180,7 @@ gii_tokenize_SOURCES = gii_tokenize.cpp porter.c porter.h magicbox.h gii_tokeniz
 gii_model1_SOURCES = gii_model1.cpp magicbox.h porter.h porter.c
 gii_model2_SOURCES = gii_model2.cpp magicbox.h porter.h porter.c
 sim_SOURCES = sim.cpp magicbox.h
+lda_SOURCES = lda.cpp magicbox.h
 AM_LDFLAGS = -lboost_program_options-mt -lboost_filesystem-mt -lexpat
 AM_CXXFLAGS = -Wall $(am__append_1)
 INCLUDES = -I@topdir@
@@ -245,6 +252,9 @@ gii_parse$(EXEEXT): $(gii_parse_OBJECTS) $(gii_parse_DEPENDENCIES)
 gii_tokenize$(EXEEXT): $(gii_tokenize_OBJECTS) $(gii_tokenize_DEPENDENCIES) 
 	@rm -f gii_tokenize$(EXEEXT)
 	$(CXXLINK) $(gii_tokenize_OBJECTS) $(gii_tokenize_LDADD) $(LIBS)
+lda$(EXEEXT): $(lda_OBJECTS) $(lda_DEPENDENCIES) 
+	@rm -f lda$(EXEEXT)
+	$(CXXLINK) $(lda_OBJECTS) $(lda_LDADD) $(LIBS)
 sim$(EXEEXT): $(sim_OBJECTS) $(sim_DEPENDENCIES) 
 	@rm -f sim$(EXEEXT)
 	$(CXXLINK) $(sim_OBJECTS) $(sim_LDADD) $(LIBS)
@@ -259,6 +269,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gii_model2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gii_parse.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gii_tokenize.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lda.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/porter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sim.Po@am__quote@
 
