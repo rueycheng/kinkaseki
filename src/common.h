@@ -10,6 +10,7 @@
 #include <boost/format.hpp>
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
+#include <boost/random.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/token_functions.hpp>
 

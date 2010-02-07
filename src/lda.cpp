@@ -5,31 +5,11 @@
 #include <algorithm>
 #include <iterator>
 #include <ctime>
-#include <boost/format.hpp>
 #include <boost/random.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
-
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
-
-//--------------------------------------------------
-// autoconf stuff
-//-------------------------------------------------- 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
-#ifdef HAVE_UNORDERED_MAP
-#include <unordered_map>
-#else
-#ifdef HAVE_TR1_UNORDERED_MAP
-#include <tr1/unordered_map>
-using namespace std::tr1;
-#endif
-#endif
 
 #include "magicbox.h"
+#include "common.h"
+#include "compat.h"
 
 using namespace std;
 using namespace magicbox;
@@ -405,11 +385,6 @@ public:
 //--------------------------------------------------
 // Utility
 //-------------------------------------------------- 
-void bye(const string& message) {
-    cerr << message << endl;
-    exit(1);
-}
-
 void bye(Getopt& g) {
     cerr << g;
     exit(0);
