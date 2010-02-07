@@ -312,6 +312,9 @@ public:
 	}
     }
 
+//--------------------------------------------------
+//     Adding note here
+//-------------------------------------------------- 
 //     void outputTheta(ostream& o) {
 // 	__R T_alpha = T * alpha;
 // 	o << alpha << ' ' << M << ' ' << T << endl; // The first line: alpha, M, and T
