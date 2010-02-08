@@ -116,8 +116,11 @@ int main(int argc, char** argv) {
 			if (!g["keep-short-word"] && t.size() < 3) continue;
 			if (!g["keep-long-word"] && t.size() > 25) continue;
 
-			if ((t[0] & 0x80) == 0x00) cout << ' ' << ps.stem(t);
-			else cout << ' ' << t;
+			if (g["keep-unstemmed"]) cout << ' ' << t;
+			else {
+			    if ((t[0] & 0x80) == 0x00) cout << ' ' << ps.stem(t);
+			    else cout << ' ' << t;
+			}
 		    }
 		}
 		cout << "\n";
