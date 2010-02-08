@@ -3,6 +3,7 @@ gii_tokenize
 gii_model1
 gii_model2
 sim
+merge
 lda
 Makefile
 config.h
