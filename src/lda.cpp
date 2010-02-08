@@ -119,15 +119,10 @@ private:
     count_type* n_zw; // topic-word, T by W
     count_type* n_z_; // topic-*, T
 
-    // Counts for the reference model (if any)
-    word_type Wref;
-    count_type* nn_zw;
-    count_type* nn_z_;
-
     prob_type* sample; // cdf for p(t|t*,w,w*), T + 1
 
     // Model initialization
-    void alloc(doc_type m, topic_type t, word_type w, word_type wref = 0) {
+    void alloc(doc_type m, topic_type t, word_type w) {
 	n_dz = new count_type[m * t];
 	n_d_ = new count_type[m];
 	n_zw = new count_type[t * w];
@@ -137,18 +132,6 @@ private:
 	fill_n(n_zw, t * w, 0);
 	fill_n(n_z_, t, 0);
 
-	if (wref) {
-	    Wref = wref;
-	    nn_zw = new count_type[t * wref];
-	    nn_z_ = new count_type[t];
-	    fill_n(nn_zw, t * wref, 0);
-	    fill_n(nn_z_, t, 0);
-	} else {
-	    Wref = 0;
-	    nn_zw = 0; // No ref
-	    nn_z_ = 0; // No ref
-	}
-
 	sample = new prob_type[t + 1];
     }
 
@@ -157,8 +140,6 @@ private:
 	delete[] n_d_; 
 	delete[] n_zw; 
 	delete[] n_z_; 
-	delete[] nn_zw; 
-	delete[] nn_z_; 
 	delete[] sample;
     }
 
@@ -174,12 +155,22 @@ private:
 	}
     }
 
-    void collectRefCount(lda_type& refm) {
+    void collectCount(lda_type& m, lda_type& refm) {
+	for (size_type i = 0; i < m.N; ++i) {
+	    const doc_type& d = m.d[i];
+	    const topic_type& z = m.z[i];
+	    const word_type& w = m.w[i];
+	    ++n_dz[d * m.T + z];
+	    ++n_d_[d];
+	    ++n_zw[z * m.W + w];
+	    ++n_z_[z];
+	}
+
 	for (size_type i = 0; i < refm.N; ++i) {
 	    const topic_type& z = refm.z[i];
 	    const word_type& w = refm.w[i];
-	    ++nn_zw[z * refm.W + w];
-	    ++nn_z_[z];
+	    ++n_zw[z * m.W + w];
+	    ++n_z_[z];
 	}
     }
 
@@ -193,14 +184,13 @@ public:
 	collectCount(m);
     }
 
-    // With reference model (`test')
+    // Two-model initialization (`test')
     LDAGibbsSampler(lda_type& m, lda_type& refm, prob_type alpha, prob_type beta):
 	m(m), alpha(alpha), beta(beta)
     {
 	this->alpha = (alpha == 0.0? 50.0/m.T: alpha); 
-	alloc(m.M, m.T, m.W, refm.W);
-	collectCount(m);
-	collectRefCount(refm);
+	alloc(m.M, m.T, m.W);
+	collectCount(m, refm);
     }
 
     void update(RNG<>& rng, prob_type* ppl = 0) {
@@ -227,8 +217,8 @@ public:
 	    prob_type f2d = n_d_[d] + T_alpha;
 	    for (topic_type zz = 0; zz < m.T; ++zz) {
 		prob_type f2n = n_dz[dT + zz] + alpha;
-		prob_type f1n = n_zw[zz * m.W + w] + beta + ((nn_zw && w < Wref)? nn_zw[zz * Wref + w]: 0);
-		prob_type f1d = n_z_[zz] + W_beta + (nn_z_? nn_z_[zz]: 0); 
+		prob_type f1n = n_zw[zz * m.W + w] + beta;
+		prob_type f1d = n_z_[zz] + W_beta; 
 		sample[zz] = (prob_of_sum += (f1n / f1d) * (f2n / f2d)); // Also obtain CDF
 	    }
 
@@ -404,13 +394,14 @@ int main(int argc, char** argv) {
     unsigned int interval = 1;
     unsigned int sample_num = 1;
     unsigned int sample_lag = 50;
+    unsigned int top_n = 100;
     string model = "model.unnamed";
     string output = "none";
     vector<string> arg;
 
     g   << $("train", "Run in the training mode")
 	<< $("test", "Run in the test mode")
-	<< $("use-docno", "Treat the first token of each input line as the docno")
+	<< $("test-cohesion", "Run in the test mode (for testing cohesion)")
 	<< $(&output, "output", "Specify the output: 'none', 'phi_theta'")
 	<< $(&model, "model,m", "Path to the model")
 	<< $(&alpha, "alpha,a", "Specify the parameter 'alpha'")
@@ -420,15 +411,14 @@ int main(int argc, char** argv) {
 	<< $(&interval, "interval", "Specify the interval (#iter) between perplexity reports")
 	<< $(&sample_num, "sample-num", "Specify the number of read-outs (after burned-in)")
 	<< $(&sample_lag, "sample-lag", "Specify the number of iteration between each read-out")
+	<< $(&top_n, "top-n", "Show only top N results")
 	<< $(&arg, "arg", "", -1)
-	<< $$$("lda {--train|--test} [options..] [input-files..]");
+	<< $$$("lda {--train|--test|--test-cohesion} [options..] [input-files..]");
 
     // 0) Prepare utilities
     RNG<> rng;
 
-    if (!g["train"] && !g["test"]) bye(g);
-    if (g["train"] && g["test"]) bye("Specify either --train or --test.  Not both.");
-
+    if (!g["train"] && !g["test"] && !g["test-cohesion"]) bye(g);
     if (arg.empty()) arg.push_back("-");
 
     if (g["train"]) {
@@ -436,7 +426,7 @@ int main(int argc, char** argv) {
 	Vocabulary<> vocab;
 	vector<unsigned int> wseq;
 	vector<unsigned int> doc;
-	vector<string> docno; // Only used when '--use-docno'
+	vector<string> docno;
 	unsigned int docno_id = 0;
 
 	foreach (const string& filename, arg) {
@@ -446,10 +436,8 @@ int main(int argc, char** argv) {
 	    while (getline(in(), words)) {
 		istringstream wstream(words);
 
-		if (g["use-docno"]) {
-		    wstream >> word;
-		    docno.push_back(word);
-		}
+		wstream >> word;
+		docno.push_back(word);
 
 		while (wstream >> word) {
 		    wseq.push_back(vocab.encode(word));
@@ -495,11 +483,9 @@ int main(int argc, char** argv) {
 	    fs::ofstream model_out(basedir / "model");
 	    training_set.save(model_out);
 
-	    if (g["use-docno"]) {
-		cerr << "Write docno\n";
-		fs::ofstream docno_out(basedir / "docno");
-		foreach (const string& no, docno) { docno_out << no << '\n'; }
-	    }
+	    cerr << "Write docno\n";
+	    fs::ofstream docno_out(basedir / "docno");
+	    foreach (const string& no, docno) { docno_out << no << '\n'; }
 	}
 
 	if (output == "phi_theta") {
@@ -522,7 +508,7 @@ int main(int argc, char** argv) {
 
 	vector<unsigned int> wseq;
 	vector<unsigned int> doc;
-	vector<string> docno; // Only used when '--use-docno'
+	vector<string> docno; 
 	unsigned int docno_id = 0;
 
 	foreach (const string& filename, arg) {
@@ -532,10 +518,8 @@ int main(int argc, char** argv) {
 	    while (getline(in(), words)) {
 		istringstream wstream(words);
 
-		if (g["use-docno"]) {
-		    wstream >> word;
-		    docno.push_back(word);
-		}
+		wstream >> word;
+		docno.push_back(word);
 
 		while (wstream >> word) {
 		    wseq.push_back(vocab.encode(word));
@@ -576,6 +560,100 @@ int main(int argc, char** argv) {
 	else if (output == "theta") {
 	    cerr << "Output theta\n";
 	    sampler.outputTheta(cout, docno);
+	}
+    }
+    else if (g["test-cohesion"]) {
+	// 1) Scan input
+	namespace fs = boost::filesystem;
+	if (!fs::exists(model)) bye("Cannot open the model directory " + model);
+	fs::path basedir(model);
+
+	fs::ifstream model_in(basedir / "model");
+	LDAModel<> training_set(model_in);
+
+	vector<string> sentences;
+	vector<string> sentno;
+	vector<string> docno;
+
+	foreach (const string& filename, arg) {
+	    AutoIn in(filename);
+	    string line;
+
+	    while (getline(in(), line)) {
+		istringstream iss(line);
+		string word;
+
+		iss >> word;
+		sentno.push_back(word); // Save the sentence no.
+		strip_after_first(word, ':');
+		docno.push_back(word); // Save the docno
+
+		strip_before_first(line, ' ');
+		sentences.push_back(line);
+	    }
+	}
+
+	unsigned int size = docno.size();
+	for (unsigned int i = 0; i < size; ++i) {
+	    string current_docno = docno[i];
+	    string current_sentno = sentno[i];
+
+	    // Stuff that I seemed to write a thousand time...
+	    typedef pair<string, float> item;
+	    vector<item> rank;
+
+	    // Locate the current document in [head, tail)
+	    unsigned head = i, tail = i;
+	    while (head > 0 && docno[head - 1] == current_docno) --head;
+	    while (tail < size && docno[tail] == current_docno) ++tail;
+
+	    for (unsigned int j = 0; j < size; ++j) {
+		if (j != i && j >= head && j < tail) continue;
+
+		// Ready
+		string synth;
+		for (unsigned int k = head; k < tail; ++k)
+		    synth += " " + (k == i? sentences[j]: sentences[k]);
+
+		// Steady...
+
+		fs::ifstream vocab_in(basedir / "vocab");
+		Vocabulary<> vocab(vocab_in);
+
+		vector<unsigned int> wseq;
+		vector<unsigned int> doc;
+		istringstream iss(synth);
+		string word;
+
+		while (iss >> word) {
+		    wseq.push_back(vocab.encode(word));
+		    doc.push_back(0);
+		}
+
+		// Go!
+		LDAModel<> test_set(wseq.size(), 1, training_set.getT(), vocab.size(), wseq, doc, rng);
+		LDAGibbsSampler<LDAModel<> > sampler(test_set, training_set, alpha, beta);
+
+		wseq.clear();
+		doc.clear();
+
+		// Run the sampler
+		float ppl = 0.0;
+		for (unsigned int iter = 1; iter <= niter; ++iter) sampler.update(rng);
+		sampler.update(rng, &ppl);
+		cerr << sentno[i] << ' ' << sentno[j] << ' ' << ppl << '\n';
+		rank.push_back(item(sentno[j], ppl));
+	    }
+
+	    if (rank.size() > top_n) 
+		nth_element(rank.begin(), rank.begin() + top_n, rank.end(), second_cmp());
+
+	    rank.erase(rank.begin() + top_n, rank.end());
+	    stable_sort(rank.begin(), rank.end(), second_cmp());
+
+	    foreach (const item& r, rank) {
+		cout << current_sentno << ' ' << r.first << ' ' << r.second << '\n';
+	    }
 	}
     }
 
