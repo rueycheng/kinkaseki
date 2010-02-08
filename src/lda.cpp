@@ -227,8 +227,8 @@ public:
 	    prob_type f2d = n_d_[d] + T_alpha;
 	    for (topic_type zz = 0; zz < m.T; ++zz) {
 		prob_type f2n = n_dz[dT + zz] + alpha;
-		prob_type f1n = n_zw[zz * m.W + w] + beta; //+ ((nn_zw && w < Wref)? nn_zw[zz * Wref + w]: 0);
-		prob_type f1d = n_z_[zz] + W_beta; // + (nn_z_? nn_z_[zz]: 0); 
+		prob_type f1n = n_zw[zz * m.W + w] + beta + ((nn_zw && w < Wref)? nn_zw[zz * Wref + w]: 0);
+		prob_type f1d = n_z_[zz] + W_beta + (nn_z_? nn_z_[zz]: 0); 
 		sample[zz] = (prob_of_sum += (f1n / f1d) * (f2n / f2d)); // Also obtain CDF
 	    }
 
