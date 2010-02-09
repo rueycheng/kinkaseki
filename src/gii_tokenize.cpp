@@ -63,6 +63,17 @@ int main(int argc, char** argv) {
 
     if (input.empty()) input.push_back("-");
 
+    // Bypass as necessary
+    if (g["bypass"]) {
+	foreach (const string& filename, input) {
+	    AutoIn in(filename);
+
+	    cout << in().rdbuf();
+	}
+
+	return 0;
+    }
+
     namespace fs = boost::filesystem;
 
     // Stopword list
