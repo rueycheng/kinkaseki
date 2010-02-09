@@ -221,7 +221,7 @@ public:
 	    }
 
 	    // NOTE: Sometimes old-fashion way works best
-	    if (ppl) *ppl += log(prob_of_sum); 
+	    //if (ppl) *ppl += log(prob_of_sum); 
 
 	    // 3) Toss the dice and get the sample
 	    prob_type toss = rng(sample_z[m.T - 1]);
@@ -280,7 +280,7 @@ public:
 		sample_x[xx] = (prob_of_sum += f1 * (f2n / f2d)); // Also obtain CDF
 	    }
 
-	    if (ppl) *ppl += log(prob_of_sum); 
+	    // if (ppl) *ppl += log(prob_of_sum); 
 
 	    // 3) Toss the dice and get the sample
 	    prob_type toss = rng(sample_x[m.S - 1]);
@@ -301,7 +301,41 @@ public:
 	    i += s_size;
 	}
 
-	if (ppl) *ppl = exp(-(*ppl) / m.N);
+	// Compute the perplexity (Can't figure out a better way to do this)
+	if (ppl) {
+	    *ppl = 0.0;
+
+	    for (size_type i = 0; i < m.N; ++i) {
+		const doc_type& d = m.d[i];
+		const word_type& w = m.w[i];
+
+		const size_type dS = d * m.S;
+		prob_type f_theta_d = n_d_[d] + S_alpha;
+
+		prob_type sum = 0.0;
+		for (topic_type xx = 0; xx < m.S; ++xx) {
+		    prob_type f_theta_n = n_dx[dS + xx] + alpha;
+		    prob_type f_tau_d = n_x_[xx] + T_delta;
+
+		    const size_type xxT = xx * m.T;
+
+		    prob_type partial_sum = 0.0;
+		    for (topic_type zz = 0; zz < m.T; ++zz) {
+			prob_type f_tau_n = n_xz[xxT + zz] + delta;
+			prob_type f_phi_n = n_zw[zz * m.W + w] + beta;
+			prob_type f_phi_d = n_z_[zz] + W_beta;
+
+			partial_sum += (f_tau_n / f_tau_d) * (f_phi_n / f_phi_d);
+		    }
+
+		    sum += (f_theta_n / f_theta_d) * partial_sum;
+		}
+
+		*ppl += log(sum);
+	    }
+
+	    *ppl = exp(-*ppl / m.N);
+	}
     }
 
     void outputTheta(ostream& o, vector<string>& docno) {
