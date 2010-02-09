@@ -160,14 +160,15 @@ private:
 	    ++n_z_[z];
 	}
 
-	//--------------------------------------------------
-	// for (size_type i = 0; i < refm.N; ++i) {
-	//     const topic_type& z = refm.z[i];
-	//     const word_type& w = refm.w[i];
-	//     ++n_zw[z * m.W + w];
-	//     ++n_z_[z];
-	// }
-	//-------------------------------------------------- 
+	for (size_type i = 0; i < refm.N; ++i) {
+	    const topic_type& x = refm.x[i];
+	    const topic_type& z = refm.z[i];
+	    const word_type& w = refm.w[i];
+	    ++n_xz[x * m.T + z];
+	    ++n_x_[x];
+	    ++n_zw[z * m.W + w];
+	    ++n_z_[z];
+	}
     }
 
 public:
