@@ -642,72 +642,82 @@ int main(int argc, char** argv) {
 	    sampler.outputTheta(cout, docno);
 	}
     }
+    else if (g["test"]) {
+	// 1) Scan input
+	namespace fs = boost::filesystem;
+	if (!fs::exists(model)) bye("Cannot open the model directory " + model);
+	fs::path basedir(model);
+
+	fs::ifstream vocab_in(basedir / "vocab");
+	Vocabulary<> vocab(vocab_in);
+
+	vector<unsigned int> wseq;
+	vector<unsigned int> doc;
+	vector<unsigned int> sent;
+	vector<string> docno;
+
+	unsigned int docno_id = 0;
+	unsigned int sentno_id = 0;
+	string last_doc;
+
+	foreach (const string& filename, arg) {
+	    AutoIn in(filename);
+	    string words, word;
+
+	    while (getline(in(), words)) {
+		istringstream wstream(words);
+
+		wstream >> word;
+		docno.push_back(word);
+
+		strip_after_first(word, ':');
+		if (last_doc != word) {
+		    if (!last_doc.empty()) ++docno_id;
+		    last_doc = word;
+		}
+
+		while (wstream >> word) {
+		    wseq.push_back(vocab.encode(word));
+		    doc.push_back(docno_id);
+		    sent.push_back(sentno_id);
+		}
+		++sentno_id;
+	    }
+	}
+	++docno_id;
+
+	fs::ifstream model_in(basedir / "model");
+	SLDAModel<> training_set(model_in);
+	SLDAModel<> test_set(wseq.size(), docno_id, sentno_id, training_set.getS(), training_set.getT(), vocab.size(), wseq, doc, sent, rng);
+	SLDAGibbsSampler<SLDAModel<> > sampler(test_set, training_set, alpha, beta, delta);
+
+	// NOTE: Clean up memory space explicitly
+	wseq.clear(); 
+	doc.clear(); 
+
+	// Run the sampler
+	for (unsigned int iter = 1; iter <= niter; ++iter) {
+	    if (interval && iter % interval == 0) {
+		long double ppl = 0.0;
+		sampler.update(rng, &ppl);
+		cerr << iter << ' ' << ppl << "\n";
+	    }
+	    else {
+		sampler.update(rng);
+		cerr << iter << "\n";
+	    }
+	}
+
+	if (output == "phi_theta") {
+	    cerr << "Output phi_theta\n";
+	    sampler.outputPhiTheta(cout, docno);
+	}
+	else if (output == "theta") {
+	    cerr << "Output theta\n";
+	    sampler.outputTheta(cout, docno);
+	}
+    }
 //--------------------------------------------------
-//     else if (g["test"]) {
-// 	// 1) Scan input
-// 	namespace fs = boost::filesystem;
-// 	if (!fs::exists(model)) bye("Cannot open the model directory " + model);
-// 	fs::path basedir(model);
-// 
-// 	fs::ifstream vocab_in(basedir / "vocab");
-// 	Vocabulary<> vocab(vocab_in);
-// 
-// 	vector<unsigned int> wseq;
-// 	vector<unsigned int> doc;
-// 	vector<string> docno; 
-// 	unsigned int docno_id = 0;
-// 
-// 	foreach (const string& filename, arg) {
-// 	    AutoIn in(filename);
-// 	    string words, word;
-// 
-// 	    while (getline(in(), words)) {
-// 		istringstream wstream(words);
-// 
-// 		wstream >> word;
-// 		docno.push_back(word);
-// 
-// 		while (wstream >> word) {
-// 		    wseq.push_back(vocab.encode(word));
-// 		    doc.push_back(docno_id);
-// 		}
-// 		++docno_id;
-// 	    }
-// 	}
-// 
-// 	fs::ifstream model_in(basedir / "model");
-// 	SLDAModel<> training_set(model_in);
-// 	SLDAModel<> test_set(wseq.size(), docno_id, training_set.getT(), vocab.size(), wseq, doc, rng);
-// 	SLDAGibbsSampler<SLDAModel<> > sampler(test_set, training_set, alpha, beta);
-// 
-// 	// NOTE: Clean up memory space explicitly
-// 	if (true) {
-// 	    wseq.clear(); 
-// 	    doc.clear(); 
-// 	}
-// 
-// 	// Run the sampler
-// 	for (unsigned int iter = 1; iter <= niter; ++iter) {
-// 	    if (interval && iter % interval == 0) {
-// 		float ppl = 0.0;
-// 		sampler.update(rng, &ppl);
-// 		cerr << iter << ' ' << ppl << "\n";
-// 	    }
-// 	    else {
-// 		sampler.update(rng);
-// 		cerr << iter << "\n";
-// 	    }
-// 	}
-// 
-// 	if (output == "phi_theta") {
-// 	    cerr << "Output phi_theta\n";
-// 	    sampler.outputPhiTheta(cout, docno);
-// 	}
-// 	else if (output == "theta") {
-// 	    cerr << "Output theta\n";
-// 	    sampler.outputTheta(cout, docno);
-// 	}
-//     }
 //     else if (g["test-cohesion"]) {
 // 	// 1) Scan input
 // 	namespace fs = boost::filesystem;
