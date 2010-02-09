@@ -133,33 +133,28 @@ private:
 
     void collectCount(slda_type& m) {
 	for (size_type i = 0; i < m.N; ++i) {
-	    const doc_type& d = m.d[i];
 	    const topic_type& x = m.x[i];
 	    const topic_type& z = m.z[i];
 	    const word_type& w = m.w[i];
-	    ++n_dx[d * m.S + x];
-	    ++n_d_[d];
 	    ++n_xz[x * m.T + z];
 	    ++n_x_[x];
 	    ++n_zw[z * m.W + w];
 	    ++n_z_[z];
+	}
+
+	for (size_type i = 0; i < m.N; ) {
+	    const doc_type& d = m.d[i];
+	    const sent_type& s = m.s[i];
+	    const topic_type& x = m.x[i];
+	    ++n_dx[d * m.S + x];
+	    ++n_d_[d];
+
+	    while (m.s[++i] == s) ;
 	}
     }
 
     void collectCount(slda_type& m, slda_type& refm) {
-	for (size_type i = 0; i < m.N; ++i) {
-	    const doc_type& d = m.d[i];
-	    const topic_type& x = m.x[i];
-	    const topic_type& z = m.z[i];
-	    const word_type& w = m.w[i];
-	    ++n_dx[d * m.S + x];
-	    ++n_d_[d];
-	    ++n_xz[x * m.T + z];
-	    ++n_x_[x];
-	    ++n_zw[z * m.W + w];
-	    ++n_z_[z];
-	}
-
+	collectCount(m);
 	for (size_type i = 0; i < refm.N; ++i) {
 	    const topic_type& x = refm.x[i];
 	    const topic_type& z = refm.z[i];
@@ -258,8 +253,8 @@ public:
 	    const size_type s_size = i_end - i;
 	    for (size_type j = i; j < i_end; ++j) --n_xz[xT + m.z[j]];
 	    n_x_[x] -= s_size;
-	    n_dx[dS + x] -= s_size;
-	    n_d_[d] -= s_size;
+	    --n_dx[dS + x];
+	    --n_d_[d];
 
 	    // 2) Calculate CDF and run the sampler
 	    prob_type prob_of_sum = 0.0;
@@ -295,8 +290,8 @@ public:
 	    const size_type xxT = xx * m.T;
 	    for (size_type j = i; j < i_end; ++j) ++n_xz[xxT + m.z[j]];
 	    n_x_[xx] += s_size;
-	    n_dx[dS + xx] += s_size;
-	    n_d_[d] += s_size;
+	    ++n_dx[dS + xx];
+	    ++n_d_[d];
 
 	    // Done with this sentence
 	    i += s_size;
