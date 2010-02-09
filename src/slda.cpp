@@ -796,7 +796,16 @@ int main(int argc, char** argv) {
 		// Run the sampler
 		long double ppl = 0.0;
 		for (unsigned int iter = 1; iter <= niter; ++iter) sampler.update(rng);
-		sampler.update(rng, &ppl);
+
+		// Take 20 consecutive samples and make average
+		long double ppl_sum = 0.0;
+		for (unsigned int n = 0; n < 20; ++n) {
+		    sampler.update(rng, &ppl);
+		    ppl_sum += ppl;
+		}
+
+		ppl = ppl_sum / 20;
+
 		cerr << sentno[i] << ' ' << sentno[j] << ' ' << ppl << '\n';
 		rank.push_back(item(sentno[j], ppl));
 	    }
