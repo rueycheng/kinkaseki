@@ -689,6 +689,7 @@ int main(int argc, char** argv) {
 	// NOTE: Clean up memory space explicitly
 	wseq.clear(); 
 	doc.clear(); 
+	sent.clear();
 
 	// Run the sampler
 	for (unsigned int iter = 1; iter <= niter; ++iter) {
@@ -712,102 +713,105 @@ int main(int argc, char** argv) {
 	    sampler.outputTheta(cout, docno);
 	}
     }
-//--------------------------------------------------
-//     else if (g["test-cohesion"]) {
-// 	// 1) Scan input
-// 	namespace fs = boost::filesystem;
-// 	if (!fs::exists(model)) bye("Cannot open the model directory " + model);
-// 	fs::path basedir(model);
-// 
-// 	fs::ifstream model_in(basedir / "model");
-// 	SLDAModel<> training_set(model_in);
-// 
-// 	vector<string> sentences;
-// 	vector<string> sentno;
-// 	vector<string> docno;
-// 
-// 	foreach (const string& filename, arg) {
-// 	    AutoIn in(filename);
-// 	    string line;
-// 
-// 	    while (getline(in(), line)) {
-// 		istringstream iss(line);
-// 		string word;
-// 
-// 		iss >> word;
-// 		sentno.push_back(word); // Save the sentence no.
-// 		strip_after_first(word, ':');
-// 		docno.push_back(word); // Save the docno
-// 
-// 		strip_before_first(line, ' ');
-// 		sentences.push_back(line);
-// 	    }
-// 	}
-// 
-// 	unsigned int size = docno.size();
-// 	for (unsigned int i = 0; i < size; ++i) {
-// 	    string current_docno = docno[i];
-// 	    string current_sentno = sentno[i];
-// 
-// 	    // Stuff that I seemed to write a thousand time...
-// 	    typedef pair<string, float> item;
-// 	    vector<item> rank;
-// 
-// 	    // Locate the current document in [head, tail)
-// 	    unsigned head = i, tail = i;
-// 	    while (head > 0 && docno[head - 1] == current_docno) --head;
-// 	    while (tail < size && docno[tail] == current_docno) ++tail;
-// 
-// 	    for (unsigned int j = 0; j < size; ++j) {
-// 		if (j != i && j >= head && j < tail) continue;
-// 
-// 		// Ready
-// 		string synth;
-// 		for (unsigned int k = head; k < tail; ++k)
-// 		    synth += " " + (k == i? sentences[j]: sentences[k]);
-// 
-// 		// Steady...
-// 
-// 		fs::ifstream vocab_in(basedir / "vocab");
-// 		Vocabulary<> vocab(vocab_in);
-// 
-// 		vector<unsigned int> wseq;
-// 		vector<unsigned int> doc;
-// 		istringstream iss(synth);
-// 		string word;
-// 
-// 		while (iss >> word) {
-// 		    wseq.push_back(vocab.encode(word));
-// 		    doc.push_back(0);
-// 		}
-// 
-// 		// Go!
-// 		SLDAModel<> test_set(wseq.size(), 1, training_set.getT(), vocab.size(), wseq, doc, rng);
-// 		SLDAGibbsSampler<SLDAModel<> > sampler(test_set, training_set, alpha, beta);
-// 
-// 		wseq.clear();
-// 		doc.clear();
-// 
-// 		// Run the sampler
-// 		float ppl = 0.0;
-// 		for (unsigned int iter = 1; iter <= niter; ++iter) sampler.update(rng);
-// 		sampler.update(rng, &ppl);
-// 		cerr << sentno[i] << ' ' << sentno[j] << ' ' << ppl << '\n';
-// 		rank.push_back(item(sentno[j], ppl));
-// 	    }
-// 
-// 	    if (rank.size() > top_n) 
-// 		nth_element(rank.begin(), rank.begin() + top_n, rank.end(), second_cmp());
-// 
-// 	    rank.erase(rank.begin() + top_n, rank.end());
-// 	    stable_sort(rank.begin(), rank.end(), second_cmp());
-// 
-// 	    foreach (const item& r, rank) {
-// 		cout << current_sentno << ' ' << r.first << ' ' << r.second << '\n';
-// 	    }
-// 	}
-//     }
-//-------------------------------------------------- 
+    else if (g["test-cohesion"]) {
+	// 1) Scan input
+	namespace fs = boost::filesystem;
+	if (!fs::exists(model)) bye("Cannot open the model directory " + model);
+	fs::path basedir(model);
+
+	fs::ifstream model_in(basedir / "model");
+	SLDAModel<> training_set(model_in);
+
+	// 2) Read the whole test collection in
+	vector<string> sentences;
+	vector<string> sentno;
+	vector<string> docno;
+
+	foreach (const string& filename, arg) {
+	    AutoIn in(filename);
+	    string line;
+
+	    while (getline(in(), line)) {
+		istringstream iss(line);
+		string word;
+
+		iss >> word;
+		sentno.push_back(word); // Save the sentence no.
+		strip_after_first(word, ':');
+		docno.push_back(word); // Save the docno
+
+		strip_before_first(line, ' ');
+		sentences.push_back(line);
+	    }
+	}
+
+	unsigned int size = docno.size();
+	for (unsigned int i = 0; i < size; ++i) {
+	    string current_docno = docno[i];
+	    string current_sentno = sentno[i];
+
+	    // Stuff that I seemed to write a thousand time...
+	    typedef pair<string, float> item;
+	    vector<item> rank;
+
+	    // Locate the current document in [head, tail)
+	    unsigned head = i, tail = i;
+	    while (head > 0 && docno[head - 1] == current_docno) --head;
+	    while (tail < size && docno[tail] == current_docno) ++tail;
+
+	    for (unsigned int j = 0; j < size; ++j) {
+		if (j != i && j >= head && j < tail) continue;
+
+		// Ready
+		fs::ifstream vocab_in(basedir / "vocab");
+		Vocabulary<> vocab(vocab_in);
+
+		vector<unsigned int> wseq;
+		vector<unsigned int> doc;
+		vector<unsigned int> sent;
+		unsigned int sentid = 0;
+
+		// Steady...
+		for (unsigned int k = head; k < tail; ++k) {
+		    string& sentence = (k == i? sentences[j]: sentences[k]);
+		    istringstream iss(sentence);
+		    string word;
+
+		    while (iss >> word) {
+			wseq.push_back(vocab.encode(word));
+			doc.push_back(0);
+			sent.push_back(sentid);
+		    }
+		    ++sentid;
+		}
+
+		// Go!
+		SLDAModel<> test_set(wseq.size(), 1, sentid, training_set.getS(), training_set.getT(), vocab.size(), wseq, doc, sent, rng);
+		SLDAGibbsSampler<SLDAModel<> > sampler(test_set, training_set, alpha, beta, delta);
+
+		wseq.clear();
+		doc.clear();
+		sent.clear();
+
+		// Run the sampler
+		long double ppl = 0.0;
+		for (unsigned int iter = 1; iter <= niter; ++iter) sampler.update(rng);
+		sampler.update(rng, &ppl);
+		cerr << sentno[i] << ' ' << sentno[j] << ' ' << ppl << '\n';
+		rank.push_back(item(sentno[j], ppl));
+	    }
+
+	    if (rank.size() > top_n) 
+		nth_element(rank.begin(), rank.begin() + top_n, rank.end(), second_cmp());
+
+	    rank.erase(rank.begin() + top_n, rank.end());
+	    stable_sort(rank.begin(), rank.end(), second_cmp());
+
+	    foreach (const item& r, rank) {
+		cout << current_sentno << ' ' << r.first << ' ' << r.second << '\n';
+	    }
+	}
+    }
 
     cerr << "Done\n";
     return 0;
