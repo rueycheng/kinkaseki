@@ -110,15 +110,14 @@ int main(int argc, char** argv) {
 		    foreach (const string& t, tok) { cout << ' ' << t; }
 		}
 		else {
+		    boost::to_lower(line);
 		    CJKVTokenizer tok(line);
 		    foreach (const string& t, tok) { 
 			if (!g["keep-stopword"] && stopword[t]) continue;
 			if (!g["keep-short-word"] && t.size() < 3) continue;
 			if (!g["keep-long-word"] && t.size() > 25) continue;
 
-			if (g["keep-unstemmed"]) {
-			    cout << ' ' << boost::to_lower_copy(t);
-			}
+			if (g["keep-unstemmed"]) cout << ' ' << t;
 			else {
 			    if ((t[0] & 0x80) == 0x00) cout << ' ' << ps.stem(t);
 			    else cout << ' ' << t;
