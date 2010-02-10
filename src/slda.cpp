@@ -334,6 +334,25 @@ public:
 	}
     }
 
+    void outputWordCluster(ostream &o, vector<string>& vocab, unsigned int top_n = 10) {
+	const prob_type W_beta = m.W * beta;
+	for (topic_type z = 0; z < m.T; ++z) {
+	    const size_type zW = z * m.W;
+	    const prob_type denom = n_z_[z] + W_beta;
+
+	    typedef pair<word_type, prob_type> item;
+	    vector<item> rank;
+	    for (word_type w = 0; w < m.W; ++z) rank.push_back(item(w, (n_zw[zW + w] + beta) / denom));
+
+	    if (rank.size() > top_n) nth_element(rank.begin(), rank.begin() + top_n, rank.end(), second_rcmp());
+	    rank.erase(rank.begin() + top_n, rank.end());
+	    stable_sort(rank.begin(), rank.end(), second_rcmp());
+	    o << z << ' ';
+	    foreach (const item& r, rank) { o << vocab.at(r.first) << ' '; }
+	    o << '\n';
+	}
+    }
+
     void outputTheta(ostream& o, vector<string>& docno) {
 	//--------------------------------------------------
 	// const prob_type T_alpha = m.T * alpha;
@@ -528,6 +547,7 @@ int main(int argc, char** argv) {
     g   << $("train", "Run in the training mode")
 	<< $("test", "Run in the test mode")
 	<< $("test-cohesion", "Run in the test mode (for testing cohesion)")
+	<< $("dump", "Run in the dump mode")
 	<< $(&output, "output", "Specify the output: 'none', 'phi_theta'")
 	<< $(&model, "model,m", "Path to the model")
 	<< $(&alpha, "alpha,a", "Specify the parameter 'alpha'")
@@ -546,7 +566,7 @@ int main(int argc, char** argv) {
     // 0) Prepare utilities
     RNG<long double> rng;
 
-    if (!g["train"] && !g["test"] && !g["test-cohesion"]) bye(g);
+    if (!g["train"] && !g["test"] && !g["test-cohesion"] && !g["dump"]) bye(g);
     if (arg.empty()) arg.push_back("-");
 
     if (g["train"]) {
@@ -819,6 +839,36 @@ int main(int argc, char** argv) {
 	    foreach (const item& r, rank) {
 		cout << current_sentno << ' ' << r.first << ' ' << r.second << '\n';
 	    }
+	}
+    }
+    else if (g["dump"]) {
+	// 1) Scan input
+	namespace fs = boost::filesystem;
+	if (!fs::exists(model)) bye("Cannot open the model directory " + model);
+	fs::path basedir(model);
+
+	fs::ifstream model_in(basedir / "model");
+	SLDAModel<> training_set(model_in);
+	SLDAGibbsSampler<SLDAModel<> > sampler(training_set, alpha, beta, delta);
+
+	vector<string> vocab;
+	fs::ifstream vocab_in(basedir / "vocab");
+	copy(istream_iterator<string>(vocab_in),
+		istream_iterator<string>(), back_inserter(vocab));
+
+	if (output == "word-cluster") {
+	    sampler.outputWordCluster(cout, vocab, top_n);
+	}
+	//--------------------------------------------------
+	// else if (output == "topic-cluster") {
+	//     sampler.outputTopicCluster(cout);
+	// }
+	// else if (output == "sentence-topic-cluster") {
+	//     sampler.outputSentenceTopicCluster(cout);
+	// }
+	//-------------------------------------------------- 
+	else {
+	    cerr << "No such format";
 	}
     }
 
