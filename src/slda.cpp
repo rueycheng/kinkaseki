@@ -342,91 +342,57 @@ public:
 
 	    typedef pair<word_type, prob_type> item;
 	    vector<item> rank;
-	    for (word_type w = 0; w < m.W; ++z) rank.push_back(item(w, (n_zw[zW + w] + beta) / denom));
+	    for (word_type w = 0; w < m.W; ++w) rank.push_back(item(w, (n_zw[zW + w] + beta) / denom));
 
-	    if (rank.size() > top_n) nth_element(rank.begin(), rank.begin() + top_n, rank.end(), second_rcmp());
-	    rank.erase(rank.begin() + top_n, rank.end());
+	    if (rank.size() > top_n) {
+		nth_element(rank.begin(), rank.begin() + top_n, rank.end(), second_rcmp());
+		rank.erase(rank.begin() + top_n, rank.end());
+	    }
 	    stable_sort(rank.begin(), rank.end(), second_rcmp());
-	    o << z << ' ';
-	    foreach (const item& r, rank) { o << vocab.at(r.first) << ' '; }
-	    o << '\n';
+	    foreach (const item& r, rank) { o << z << ' ' << vocab.at(r.first) << ' ' << r.second << '\n'; }
 	}
     }
 
-    void outputTheta(ostream& o, vector<string>& docno) {
-	//--------------------------------------------------
-	// const prob_type T_alpha = m.T * alpha;
-	// const doc_type M = m.M;
-	// const topic_type T = m.T;
-	// bool use_docno = docno.size() == M;
-	//-------------------------------------------------- 
+    void outputTopicCluster(ostream &o, unsigned int top_n = 10) {
+	const prob_type T_delta = m.T * delta;
+	for (topic_type x = 0; x < m.S; ++x) {
+	    const size_type xT = x * m.T;
+	    const prob_type denom = n_x_[x] + T_delta;
 
-	//--------------------------------------------------
-	// for (doc_type d = 0; d < M; ++d) {
-	//     if (use_docno) o << docno.at(d) << ' ';
-	//-------------------------------------------------- 
+	    typedef pair<word_type, prob_type> item;
+	    vector<item> rank;
+	    for (topic_type z = 0; z < m.T; ++z) rank.push_back(item(z, (n_xz[xT + z] + delta) / denom));
 
-	//--------------------------------------------------
-	//     prob_type denom = T_alpha + n_d_[d];
-	//     for (topic_type z = 0; z < T; ++z) o << (alpha + n_dz[d * T + z]) / denom << ' ';
-	//     o << "\n";
-	// }
-	//-------------------------------------------------- 
+	    if (rank.size() > top_n) {
+		nth_element(rank.begin(), rank.begin() + top_n, rank.end(), second_rcmp());
+		rank.erase(rank.begin() + top_n, rank.end());
+	    }
+	    stable_sort(rank.begin(), rank.end(), second_rcmp());
+	    foreach (const item& r, rank) { o << x << ' ' << r.first << ' ' << r.second << '\n'; }
+	}
     }
 
-    void outputPhiTheta(ostream& o, vector<string>& docno) {
-	//--------------------------------------------------
-	// const prob_type W_beta = m.W * beta;
-	// const prob_type T_alpha = m.T * alpha;
-	// const doc_type M = m.M;
-	// const word_type W = m.W;
-	// const topic_type T = m.T;
-	// bool use_docno = docno.size() == M;
-	//-------------------------------------------------- 
+    void outputSentenceTopicCluster(ostream &o, vector<string>& docno, unsigned int top_n = 10) {
+	const prob_type S_alpha = m.S * alpha;
+	for (doc_type d = 0; d < m.M; ++d) {
+	    const size_type dS = d * m.S;
+	    const prob_type denom = n_d_[d] + S_alpha;
 
-	//--------------------------------------------------
-	// for (doc_type d = 0; d < M; ++d) {
-	//     if (use_docno) o << docno.at(d) << ' ';
-	//-------------------------------------------------- 
+	    typedef pair<word_type, prob_type> item;
+	    vector<item> rank;
+	    for (topic_type x = 0; x < m.S; ++x) rank.push_back(item(x, (n_dx[dS + x] + alpha) / denom));
 
-	//--------------------------------------------------
-	//     prob_type theta_denom = T_alpha + n_d_[d];
-	//     for (word_type w = 0; w < W; ++w) {
-	// 	prob_type sum = 0;
-	// 	for (topic_type z = 0; z < T; ++z) {
-	// 	    prob_type theta_dz = (alpha + n_dz[d * T + z]) / theta_denom;
-	// 	    prob_type phi_zw = (beta + n_zw[z * W + w]) / (W_beta + n_z_[z]);
-	// 	    sum += theta_dz * phi_zw;
-	// 	}
-	// 	o << sum << ' ';
-	//     }
-	//     o << "\n";
-	// }
-	//-------------------------------------------------- 
+	    if (rank.size() > top_n) {
+		nth_element(rank.begin(), rank.begin() + top_n, rank.end(), second_rcmp());
+		rank.erase(rank.begin() + top_n, rank.end());
+	    }
+	    stable_sort(rank.begin(), rank.end(), second_rcmp());
+	    foreach (const item& r, rank) { o << docno.at(d) << ' ' << r.first << ' ' << r.second << '\n'; }
+	}
     }
 
-//--------------------------------------------------
-//     Adding note here
-//-------------------------------------------------- 
-//     void outputTheta(ostream& o) {
-// 	__R T_alpha = T * alpha;
-// 	o << alpha << ' ' << M << ' ' << T << endl; // The first line: alpha, M, and T
-// 	for (__I j = 0; j < M; ++j) {
-// 	    __R denom = T_alpha + n_dx[j];
-// 	    for (short k = 0; k < T; ++k) o << (alpha + n_dt[j * T + k]) / denom << ' ';
-// 	    o << endl;
-// 	}
-//     }
-//     
-//     void outputPhi(ostream& o) {
-// 	__R W_beta = W * beta;
-// 	o << beta << ' ' << T << ' ' << W << endl; // The first line: beta, T, and W
-// 	for (short k = 0; k < T; ++k) {
-// 	    __R denom = W_beta + n_xt[k];
-// 	    for (__I v = 0; v < W; ++v) o << (beta + n_wt[v * T + k]) / denom << ' ';
-// 	    o << endl;
-// 	}
-//     }
+    void outputTheta(ostream& o, vector<string>& docno) { }
+    void outputPhiTheta(ostream& o, vector<string>& docno) { }
 
     ~SLDAGibbsSampler() { free(); }
 };
@@ -851,22 +817,25 @@ int main(int argc, char** argv) {
 	SLDAModel<> training_set(model_in);
 	SLDAGibbsSampler<SLDAModel<> > sampler(training_set, alpha, beta, delta);
 
-	vector<string> vocab;
-	fs::ifstream vocab_in(basedir / "vocab");
-	copy(istream_iterator<string>(vocab_in),
-		istream_iterator<string>(), back_inserter(vocab));
-
 	if (output == "word-cluster") {
+	    vector<string> vocab;
+	    fs::ifstream vocab_in(basedir / "vocab");
+	    copy(istream_iterator<string>(vocab_in),
+		    istream_iterator<string>(), back_inserter(vocab));
+
 	    sampler.outputWordCluster(cout, vocab, top_n);
 	}
-	//--------------------------------------------------
-	// else if (output == "topic-cluster") {
-	//     sampler.outputTopicCluster(cout);
-	// }
-	// else if (output == "sentence-topic-cluster") {
-	//     sampler.outputSentenceTopicCluster(cout);
-	// }
-	//-------------------------------------------------- 
+	else if (output == "topic-cluster") {
+	    sampler.outputTopicCluster(cout, top_n);
+	}
+	else if (output == "sentence-topic-cluster") {
+	    vector<string> docno;
+	    fs::ifstream docno_in(basedir / "docno");
+	    copy(istream_iterator<string>(docno_in),
+		    istream_iterator<string>(), back_inserter(docno));
+
+	    sampler.outputSentenceTopicCluster(cout, docno, top_n);
+	}
 	else {
 	    cerr << "No such format";
 	}
