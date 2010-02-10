@@ -359,7 +359,7 @@ public:
 	    const size_type xT = x * m.T;
 	    const prob_type denom = n_x_[x] + T_delta;
 
-	    typedef pair<word_type, prob_type> item;
+	    typedef pair<topic_type, prob_type> item;
 	    vector<item> rank;
 	    for (topic_type z = 0; z < m.T; ++z) rank.push_back(item(z, (n_xz[xT + z] + delta) / denom));
 
@@ -378,7 +378,7 @@ public:
 	    const size_type dS = d * m.S;
 	    const prob_type denom = n_d_[d] + S_alpha;
 
-	    typedef pair<word_type, prob_type> item;
+	    typedef pair<topic_type, prob_type> item;
 	    vector<item> rank;
 	    for (topic_type x = 0; x < m.S; ++x) rank.push_back(item(x, (n_dx[dS + x] + alpha) / denom));
 
@@ -388,6 +388,34 @@ public:
 	    }
 	    stable_sort(rank.begin(), rank.end(), second_rcmp());
 	    foreach (const item& r, rank) { o << docno.at(d) << ' ' << r.first << ' ' << r.second << '\n'; }
+	}
+    }
+
+    void outputWordMixtureForSentenceTopic(ostream &o, vector<string>& vocab, unsigned int top_n = 10) {
+	const prob_type T_delta = m.T * delta;
+	const prob_type W_beta = m.W * beta;
+
+	for (topic_type x = 0; x < m.S; ++x) {
+	    const size_type xT = x * m.T;
+	    const prob_type denom = n_x_[x] + T_delta;
+
+	    typedef pair<word_type, prob_type> item;
+	    vector<item> rank;
+
+	    for (word_type w = 0; w < m.W; ++w) {
+		prob_type sum = 0.0;
+		for (topic_type z = 0; z < m.T; ++z) 
+		    sum += ((n_zw[z * m.W + w] + beta) / (n_z_[z] + W_beta)) * ((n_xz[xT + z] + delta) / denom );
+		rank.push_back(item(w, sum));
+	    }
+
+	    if (rank.size() > top_n) {
+		nth_element(rank.begin(), rank.begin() + top_n, rank.end(), second_rcmp());
+		rank.erase(rank.begin() + top_n, rank.end());
+	    }
+
+	    stable_sort(rank.begin(), rank.end(), second_rcmp());
+	    foreach (const item& r, rank) { o << x << ' ' << vocab.at(r.first) << ' ' << r.second << '\n'; }
 	}
     }
 
@@ -835,6 +863,14 @@ int main(int argc, char** argv) {
 		    istream_iterator<string>(), back_inserter(docno));
 
 	    sampler.outputSentenceTopicCluster(cout, docno, top_n);
+	}
+	else if (output == "word-mixture") {
+	    vector<string> vocab;
+	    fs::ifstream vocab_in(basedir / "vocab");
+	    copy(istream_iterator<string>(vocab_in),
+		    istream_iterator<string>(), back_inserter(vocab));
+
+	    sampler.outputWordMixtureForSentenceTopic(cout, vocab, top_n);
 	}
 	else {
 	    cerr << "No such format";
