@@ -1,0 +1,24 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+my %cluster = ();
+
+while (<>) {
+    my ($c, $w, $score) = split /\s/, $_;
+    $cluster{$c} ||= [];
+    push @{$cluster{$c}}, [$w, $score];
+}
+
+my @c = sort { $a <=> $b } keys %cluster;
+my $size = scalar @{$cluster{$c[0]}};
+
+while (@c) {
+    my @cc = @c > 5? splice @c, 0, 5: splice @c, 0;
+    my $template = '%25s %0.6f';
+    for (1 .. $size) {
+	print join(' ', map sprintf($template, @$_), map shift(@{$cluster{$_}}), @cc), "\n";
+    }
+    print "\n";
+}
