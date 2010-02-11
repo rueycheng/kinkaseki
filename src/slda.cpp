@@ -525,8 +525,8 @@ int main(int argc, char** argv) {
     Getopt g(argc, argv);
 
     float alpha = 0;
-    float beta = 0.01;
-    float delta = 0.01;
+    float beta = 0;
+    float delta = 0;
     unsigned int nwtopic = 100;
     unsigned int nstopic = 100;
     unsigned int niter = 1000;
@@ -562,6 +562,18 @@ int main(int argc, char** argv) {
 
     if (!g["train"] && !g["test"] && !g["test-cohesion"] && !g["dump"]) bye(g);
     if (arg.empty()) arg.push_back("-");
+
+    if (alpha == 0.0) alpha = 0.6433 / nstopic;
+    if (beta == 0.0) beta = 0.000146 * nstopic + 1.4528713 / nwtopic;
+    if (delta == 0.0) delta = 0.00005276 * nstopic + 0.2156 / nwtopic;
+
+    if (!g["dump"]) {
+	cerr << "S: " << nstopic << '\n';
+	cerr << "T: " << nwtopic << '\n';
+	cerr << "alpha: " << alpha << '\n';
+	cerr << "beta: " << beta << '\n';
+	cerr << "delta: " << delta << '\n';
+    }
 
     if (g["train"]) {
 	// 1) Scan input
@@ -877,7 +889,7 @@ int main(int argc, char** argv) {
 	}
     }
 
-    cerr << "Done\n";
+    if (!g["dump"]) cerr << "Done\n";
     return 0;
 }
 

@@ -242,6 +242,25 @@ public:
 	if (ppl) *ppl = exp(-(*ppl) / m.N);
     }
 
+    void outputWordCluster(ostream &o, vector<string>& vocab, unsigned int top_n = 10) {
+	const prob_type W_beta = m.W * beta;
+	for (topic_type z = 0; z < m.T; ++z) {
+	    const size_type zW = z * m.W;
+	    const prob_type denom = n_z_[z] + W_beta;
+
+	    typedef pair<word_type, prob_type> item;
+	    vector<item> rank;
+	    for (word_type w = 0; w < m.W; ++w) rank.push_back(item(w, (n_zw[zW + w] + beta) / denom));
+
+	    if (rank.size() > top_n) {
+		nth_element(rank.begin(), rank.begin() + top_n, rank.end(), second_rcmp());
+		rank.erase(rank.begin() + top_n, rank.end());
+	    }
+	    stable_sort(rank.begin(), rank.end(), second_rcmp());
+	    foreach (const item& r, rank) { o << z << ' ' << vocab.at(r.first) << ' ' << r.second << '\n'; }
+	}
+    }
+
     void outputTheta(ostream& o, vector<string>& docno) {
 	const prob_type T_alpha = m.T * alpha;
 	const doc_type M = m.M;
@@ -402,6 +421,7 @@ int main(int argc, char** argv) {
     g   << $("train", "Run in the training mode")
 	<< $("test", "Run in the test mode")
 	<< $("test-cohesion", "Run in the test mode (for testing cohesion)")
+	<< $("dump", "Run in the dump mode")
 	<< $(&output, "output", "Specify the output: 'none', 'phi_theta'")
 	<< $(&model, "model,m", "Path to the model")
 	<< $(&alpha, "alpha,a", "Specify the parameter 'alpha'")
@@ -413,12 +433,12 @@ int main(int argc, char** argv) {
 	<< $(&sample_lag, "sample-lag", "Specify the number of iteration between each read-out")
 	<< $(&top_n, "top-n", "Show only top N results")
 	<< $(&arg, "arg", "", -1)
-	<< $$$("lda {--train|--test|--test-cohesion} [options..] [input-files..]");
+	<< $$$("lda {--train|--test|--test-cohesion|--dump} [options..] [input-files..]");
 
     // 0) Prepare utilities
     RNG<> rng;
 
-    if (!g["train"] && !g["test"] && !g["test-cohesion"]) bye(g);
+    if (!g["train"] && !g["test"] && !g["test-cohesion"] && !g["dump"]) bye(g);
     if (arg.empty()) arg.push_back("-");
 
     if (g["train"]) {
@@ -656,8 +676,55 @@ int main(int argc, char** argv) {
 	    }
 	}
     }
+    else if (g["dump"]) {
+	// 1) Scan input
+	namespace fs = boost::filesystem;
+	if (!fs::exists(model)) bye("Cannot open the model directory " + model);
+	fs::path basedir(model);
 
-    cerr << "Done\n";
+	fs::ifstream model_in(basedir / "model");
+	LDAModel<> training_set(model_in);
+	LDAGibbsSampler<LDAModel<> > sampler(training_set, alpha, beta);
+
+	if (output == "word-cluster") {
+	    vector<string> vocab;
+	    fs::ifstream vocab_in(basedir / "vocab");
+	    copy(istream_iterator<string>(vocab_in),
+		    istream_iterator<string>(), back_inserter(vocab));
+
+	    sampler.outputWordCluster(cout, vocab, top_n);
+	}
+	//--------------------------------------------------
+	// else if (output == "topic-cluster") {
+	//     sampler.outputTopicCluster(cout, top_n);
+	// }
+	// else if (output == "sentence-topic-cluster") {
+	//     vector<string> docno;
+	//     fs::ifstream docno_in(basedir / "docno");
+	//     copy(istream_iterator<string>(docno_in),
+	// 	    istream_iterator<string>(), back_inserter(docno));
+	//-------------------------------------------------- 
+
+	//--------------------------------------------------
+	//     sampler.outputSentenceTopicCluster(cout, docno, top_n);
+	// }
+	// else if (output == "word-mixture") {
+	//     vector<string> vocab;
+	//     fs::ifstream vocab_in(basedir / "vocab");
+	//     copy(istream_iterator<string>(vocab_in),
+	// 	    istream_iterator<string>(), back_inserter(vocab));
+	//-------------------------------------------------- 
+
+	//--------------------------------------------------
+	//     sampler.outputWordMixtureForSentenceTopic(cout, vocab, top_n);
+	// }
+	//-------------------------------------------------- 
+	else {
+	    cerr << "No such format";
+	}
+    }
+
+    if (!g["dump"]) cerr << "Done\n";
     return 0;
 }
 
