@@ -42,7 +42,9 @@ int main(int argc, char** argv) {
 		string word;
 
 		iss >> word;
-		strip_after_first(word, ':');
+
+		if (word.empty()) continue;
+		if (!boost::ends_with(word, ":facet")) strip_after_first(word, ':');
 
 		if (current_doc != word) {
 		    if (!current_doc.empty()) cout << '\n';

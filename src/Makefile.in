@@ -31,8 +31,9 @@ NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
 bin_PROGRAMS = gii_parse$(EXEEXT) gii_tokenize$(EXEEXT) \
-	gii_model1$(EXEEXT) gii_model2$(EXEEXT) sim$(EXEEXT) \
-	merge$(EXEEXT) lda$(EXEEXT) slda$(EXEEXT)
+	gii_invert$(EXEEXT) gii_model1$(EXEEXT) gii_model2$(EXEEXT) \
+	gii_model3$(EXEEXT) sim$(EXEEXT) merge$(EXEEXT) lda$(EXEEXT) \
+	slda$(EXEEXT)
 @USE_CXX0X_TRUE@am__append_1 = -std=c++0x
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
@@ -47,12 +48,18 @@ CONFIG_CLEAN_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS)
+am_gii_invert_OBJECTS = gii_invert.$(OBJEXT)
+gii_invert_OBJECTS = $(am_gii_invert_OBJECTS)
+gii_invert_LDADD = $(LDADD)
 am_gii_model1_OBJECTS = gii_model1.$(OBJEXT) porter.$(OBJEXT)
 gii_model1_OBJECTS = $(am_gii_model1_OBJECTS)
 gii_model1_LDADD = $(LDADD)
 am_gii_model2_OBJECTS = gii_model2.$(OBJEXT) porter.$(OBJEXT)
 gii_model2_OBJECTS = $(am_gii_model2_OBJECTS)
 gii_model2_LDADD = $(LDADD)
+am_gii_model3_OBJECTS = gii_model3.$(OBJEXT) porter.$(OBJEXT)
+gii_model3_OBJECTS = $(am_gii_model3_OBJECTS)
+gii_model3_LDADD = $(LDADD)
 am_gii_parse_OBJECTS = gii_parse.$(OBJEXT)
 gii_parse_OBJECTS = $(am_gii_parse_OBJECTS)
 gii_parse_LDADD = $(LDADD)
@@ -83,10 +90,12 @@ CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 CXXLD = $(CXX)
 CXXLINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
 	-o $@
-SOURCES = $(gii_model1_SOURCES) $(gii_model2_SOURCES) \
+SOURCES = $(gii_invert_SOURCES) $(gii_model1_SOURCES) \
+	$(gii_model2_SOURCES) $(gii_model3_SOURCES) \
 	$(gii_parse_SOURCES) $(gii_tokenize_SOURCES) $(lda_SOURCES) \
 	$(merge_SOURCES) $(sim_SOURCES) $(slda_SOURCES)
-DIST_SOURCES = $(gii_model1_SOURCES) $(gii_model2_SOURCES) \
+DIST_SOURCES = $(gii_invert_SOURCES) $(gii_model1_SOURCES) \
+	$(gii_model2_SOURCES) $(gii_model3_SOURCES) \
 	$(gii_parse_SOURCES) $(gii_tokenize_SOURCES) $(lda_SOURCES) \
 	$(merge_SOURCES) $(sim_SOURCES) $(slda_SOURCES)
 ETAGS = etags
@@ -183,8 +192,10 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 gii_parse_SOURCES = gii_parse.cpp magicbox.h expatpp.h expatpp_callback.h gii_parse.h
 gii_tokenize_SOURCES = gii_tokenize.cpp porter.c porter.h magicbox.h gii_tokenize.h
+gii_invert_SOURCES = gii_invert.cpp magicbox.h
 gii_model1_SOURCES = gii_model1.cpp magicbox.h porter.h porter.c
 gii_model2_SOURCES = gii_model2.cpp magicbox.h porter.h porter.c
+gii_model3_SOURCES = gii_model3.cpp magicbox.h porter.h porter.c
 sim_SOURCES = sim.cpp magicbox.h
 merge_SOURCES = merge.cpp magicbox.h
 lda_SOURCES = lda.cpp magicbox.h
@@ -248,12 +259,18 @@ uninstall-binPROGRAMS:
 
 clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
+gii_invert$(EXEEXT): $(gii_invert_OBJECTS) $(gii_invert_DEPENDENCIES) 
+	@rm -f gii_invert$(EXEEXT)
+	$(CXXLINK) $(gii_invert_OBJECTS) $(gii_invert_LDADD) $(LIBS)
 gii_model1$(EXEEXT): $(gii_model1_OBJECTS) $(gii_model1_DEPENDENCIES) 
 	@rm -f gii_model1$(EXEEXT)
 	$(CXXLINK) $(gii_model1_OBJECTS) $(gii_model1_LDADD) $(LIBS)
 gii_model2$(EXEEXT): $(gii_model2_OBJECTS) $(gii_model2_DEPENDENCIES) 
 	@rm -f gii_model2$(EXEEXT)
 	$(CXXLINK) $(gii_model2_OBJECTS) $(gii_model2_LDADD) $(LIBS)
+gii_model3$(EXEEXT): $(gii_model3_OBJECTS) $(gii_model3_DEPENDENCIES) 
+	@rm -f gii_model3$(EXEEXT)
+	$(CXXLINK) $(gii_model3_OBJECTS) $(gii_model3_LDADD) $(LIBS)
 gii_parse$(EXEEXT): $(gii_parse_OBJECTS) $(gii_parse_DEPENDENCIES) 
 	@rm -f gii_parse$(EXEEXT)
 	$(CXXLINK) $(gii_parse_OBJECTS) $(gii_parse_LDADD) $(LIBS)
@@ -279,8 +296,10 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gii_invert.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gii_model1.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gii_model2.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gii_model3.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gii_parse.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gii_tokenize.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lda.Po@am__quote@

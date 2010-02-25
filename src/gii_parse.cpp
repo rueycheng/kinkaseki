@@ -42,7 +42,7 @@ namespace std {
 	unsigned int id = 0;
 
 	foreach (const string& content, doc.contents) {
-	    o << boost::format("%s#%02d") % doc.docno % ++id;
+	    o << boost::format("%s:%02d") % doc.docno % ++id;
 	    if (!doc.sysno.empty()) o << '@' << doc.sysno;
 	    o << ' ' << content << "\n";
 	}
