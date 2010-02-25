@@ -1,7 +1,9 @@
 gii_parse
 gii_tokenize
+gii_invert
 gii_model1
 gii_model2
+gii_model3
 sim
 merge
 lda
