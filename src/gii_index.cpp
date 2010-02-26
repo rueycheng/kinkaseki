@@ -138,15 +138,14 @@ int main(int argc, char** argv) {
 
     while (getline(cin, line)) {
 	istringstream iss(line);
-
 	iss >> docno;
-	cerr << docno << '\n';
-
 	if (!boost::ends_with(docno, ":facet")) {
 	    // Spawn a new posting list and make it current
 	    documents.push_back(document_posting_list());
 	    unsigned int docid = documents.size();
 	    document_posting_list& current = documents.back();
+
+	    cerr << boost::format("%d %s") % docid % docno << '\n';
 
 	    string t;
 	    unsigned int doclen = 0;
@@ -155,7 +154,14 @@ int main(int argc, char** argv) {
 	    typedef unordered_map<string, unsigned short> count_table;
 	    count_table freq;
 	    while (iss >> t) ++freq[t];
-	    foreach (const count_table::value_type& p, freq) { terms[p.first].add(docid, p.second); }
+
+	    foreach (const count_table::value_type& p, freq) { 
+		terms[p.first].add(docid, p.second); 
+		doclen += p.second;
+
+		float log_count = log(p.second);
+		docnorm += (1 + log_count) * (1 + log_count);
+	    }
 
 	    current.set_docno(docno);
 	    current.set_doclen(doclen);
@@ -176,7 +182,7 @@ int main(int argc, char** argv) {
 	}
     }
 
-    cerr << "Done" << '\n';
+    cerr << '\n';
 
     // Sort the vocabulary
     using __gnu_cxx::select1st;
