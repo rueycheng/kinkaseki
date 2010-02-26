@@ -95,6 +95,25 @@ namespace std {
 };
 
 //--------------------------------------------------
+// Functor
+//-------------------------------------------------- 
+template<typename M> struct map_lookup {
+    map_lookup(const M& m, typename M::mapped_type z): m(m), z(z) {}
+    typename M::mapped_type operator()(typename M::key_type key) const { 
+	typename M::const_iterator p = m.find(key);
+       	return (p == m.end())? z: p->second; // HACK: unforunately operator[] is never `const'
+    }
+
+private:
+    const M& m;
+    typename M::mapped_type z;
+};
+
+template<typename M> map_lookup<M> lookup(const M& m, typename M::mapped_type z) {
+    return map_lookup<M>(m, z);
+}
+
+//--------------------------------------------------
 // 
 //-------------------------------------------------- 
 template<typename T> struct writer {
@@ -107,24 +126,40 @@ namespace std {
 };
 
 //--------------------------------------------------
+// Subroutines
+//-------------------------------------------------- 
+namespace fs = boost::filesystem;
+
+void create_model(fs::path& basedir);
+void query_model(fs::path& basedir);
+
+//--------------------------------------------------
 // Main program
 //-------------------------------------------------- 
 int main(int argc, char** argv) {
-
     // Getopt
     string model = "model.unnamed";
 
     Getopt g(argc, argv);
-    g   << $(&model, "model,m", "Specify the model directory")
+    g   << $("query", "Query the model")
+	<< $(&model, "model,m", "Specify the model directory")
 	<< $$$("");
 
     // Create model directory
-    namespace fs = boost::filesystem;
-
     fs::create_directory(model);
-    if (!fs::exists(model)) die("Cannot create directory " + model);
+    if (!fs::exists(model)) die("Cannot open directory " + model);
     fs::path basedir(model);
 
+    if (!g["query"]) create_model(basedir);
+    else query_model(basedir);
+
+    return 0;
+}
+
+//--------------------------------------------------
+// Case 1:  Create a model
+//-------------------------------------------------- 
+void create_model(fs::path& basedir) {
     // Structures
     vector<document_posting_list> documents; // A forward index + aux. info (e.g., doclen, docnorm, ..)
     unordered_map<string, term_posting_list> terms; // An inverted index
@@ -227,8 +262,8 @@ int main(int argc, char** argv) {
 	vector<unsigned int> offset;
 	foreach (const string& term, vocab) {
 	    const term_posting_list& tpl = terms[term];
-	    t2d_out << tpl;
 	    offset.push_back(t2d_out.tellp());
+	    t2d_out << tpl;
 	}
 
 	t2d_out.seekp(0);
@@ -244,13 +279,42 @@ int main(int argc, char** argv) {
 
 	vector<unsigned int> offset;
 	foreach (const document_posting_list& dpl, documents) {
-	    d2f_out << dpl;
 	    offset.push_back(d2f_out.tellp());
+	    d2f_out << dpl;
 	}
 
 	d2f_out.seekp(0);
 	foreach (const unsigned int off, offset) { d2f_out << pack(off); }
     }
+}
 
-    return 0;
+//--------------------------------------------------
+// Case 2:  Query the model
+//-------------------------------------------------- 
+void query_model(fs::path& basedir) {
+    unordered_map<string, unsigned int> vocab;
+
+    // Load vocab
+    {
+	fs::ifstream vocab_in(basedir / "vocab");
+	cerr << "Load " << basedir / "vocab" << '\n';
+
+	string t;
+	unsigned int id = 0;
+	while (getline(vocab_in, t)) vocab[t] = ++id;
+    }
+
+    // Now work with cin
+    string topicno;
+    string line;
+
+    while (getline(cin, line)) {
+	istringstream iss(line);
+	iss >> topicno;
+
+	vector<unsigned int> query;
+	transform(istream_iterator<string>(iss), istream_iterator<string>(), 
+		back_inserter(query), lookup(vocab, 0));
+	copy(query.begin(), query.end(), ostream_iterator<unsigned int>(cout, " "));
+    }
 }
