@@ -113,6 +113,36 @@ template<typename M> map_lookup<M> lookup(const M& m, typename M::mapped_type z)
     return map_lookup<M>(m, z);
 }
 
+template<typename M> struct cmp_value_less {
+    cmp_value_less(const M& m): m(m) {}
+    bool operator()(typename M::size_type x, typename M::size_type y) const {
+	return m[x] < m[y];
+    }
+
+private:
+    const M& m;
+};
+
+template<typename M> 
+cmp_value_less<M> value_less(const M& m) {
+    return cmp_value_less<M>(m);
+}
+
+template<typename M> struct cmp_value_greater {
+    cmp_value_greater(const M& m): m(m) {}
+    bool operator()(typename M::size_type x, typename M::size_type y) const {
+	return m[x] > m[y];
+    }
+
+private:
+    const M& m;
+};
+
+template<typename M> 
+cmp_value_greater<M> value_greater(const M& m) {
+    return cmp_value_greater<M>(m);
+}
+
 //--------------------------------------------------
 // 
 //-------------------------------------------------- 
@@ -167,6 +197,7 @@ void create_model(fs::path& basedir) {
 
     unordered_map<string, unsigned int> facets; // An id-lookup table for facets
     vector<string> facets_fwd;
+    unsigned int collectionlen = 0;
 
     // Now work with cin (I hate over-indented codes)
     string docno;
@@ -202,6 +233,8 @@ void create_model(fs::path& basedir) {
 	    current.set_docno(docno);
 	    current.set_doclen(doclen);
 	    current.set_docnorm(docnorm);
+
+	    collectionlen += doclen;
 	}
 	else {
 	    // The latest is the current
@@ -287,6 +320,13 @@ void create_model(fs::path& basedir) {
 	d2f_out.seekp(0);
 	foreach (const unsigned int off, offset) { d2f_out << pack(off); }
     }
+
+    // Output collection
+    {
+	fs::ofstream collection_out(basedir / "collection");
+	cerr << "Save " << basedir / "collection" << '\n';
+	collection_out << collectionlen << '\n';
+    }
 }
 
 //--------------------------------------------------
@@ -319,20 +359,157 @@ void query_model(fs::path& basedir, bool with_facet) {
 	string t;
 
 	docno_in >> N;
+	docno.push_back("<unk>");
 	while (docno_in >> t) docno.push_back(t);
     }
 
-    // Now work with cin
+    // Load facet
+    unsigned int F;
+    vector<string> facet;
+
+    {
+	fs::ifstream facet_in(basedir / "facet");
+	cerr << "Load " << basedir / "facet" << '\n';
+
+	string t;
+
+	facet_in >> F;
+	facet.push_back("<unk>");
+	while (facet_in >> t) facet.push_back(t);
+    }
+
+    // Score accumulator (`brute-force')
+    vector<float> score;
+    score.resize(N + 1);
+
+    vector<unsigned short> count;
+    count.resize(F + 1);
+
+    // Load t2d offset
+    fs::ifstream t2d_in(basedir / "t2d");
+    vector<unsigned int> t2d_offset;
+    t2d_offset.resize(T + 1);
+    cerr << "Load " << basedir / "t2d" << " (offsets)" << '\n';
+    for (unsigned int i = 1; i <= T; ++i) t2d_in >> unpack(t2d_offset[i]);
+
+    // Load d2f offset
+    fs::ifstream d2f_in(basedir / "d2f");
+    vector<unsigned int> d2f_offset;
+    d2f_offset.resize(N + 1);
+    cerr << "Load " << basedir / "d2f" << " (offsets)" << '\n';
+    for (unsigned int i = 1; i <= N; ++i) d2f_in >> unpack(d2f_offset[i]);
+
+    // Load dlen
+    vector<unsigned int> dlen;
+    dlen.resize(N + 1);
+    cerr << "Load " << basedir / "d2f" << " (dlen)" << '\n';
+    for (unsigned int i = 1; i <= N; ++i) {
+	d2f_in.seekg(d2f_offset[i]);
+	d2f_in >> unpack(dlen[i]);
+    }
+
+    // Load collection
+    unsigned int L;
+    
+    {
+	fs::ifstream collection_in(basedir / "collection");
+	collection_in >> L;
+    }
+
+    // HACK: They said programmers are lazy people
+    const float mu = 2500.0;
+
+    // Now, we are ready to work with queries
+    unsigned int topic_id = 0;
     string topicno;
     string line;
 
     while (getline(cin, line)) {
 	istringstream iss(line);
 	iss >> topicno;
+	++topic_id;
 
+	// Make sure we had a good topic number
 	vector<unsigned int> query;
+
+	if (boost::ends_with(topicno, ":topic")) strip_after_first(topicno, ':');
+	else {
+	    query.push_back(lookup(vocab, 0)(topicno)); // Otherwise, throw it back into the query
+	    topicno = str(boost::format("%03d") % topic_id);
+	}
+
+	// Read the rest of the query
 	transform(istream_iterator<string>(iss), istream_iterator<string>(), 
 		back_inserter(query), lookup(vocab, 0));
-	copy(query.begin(), query.end(), ostream_iterator<unsigned int>(cout, " "));
+
+	// Reset the accumulators
+	fill(score.begin(), score.end(), 0.0);
+
+	// Iterate through each term
+	foreach (unsigned int term_id, query) {
+	    if (term_id == 0) continue;
+
+	    // Make a jump
+	    t2d_in.seekg(t2d_offset[term_id]);
+
+	    unsigned int df, tf;
+	    t2d_in >> unpack(df) >> unpack(tf);
+
+	    for (unsigned int i = 0; i < df; ++i) {
+		unsigned int doc_id, count;
+		t2d_in >> unpack(doc_id) >> unpack(count);
+		score[doc_id] += log(1 + float(count * L) / (mu * tf));
+	    }
+	}
+
+	// Collect non-zero id's
+	unsigned int qlen = query.size();
+	vector<unsigned int> candidate;
+	for (unsigned int i = 1; i <= N; ++i) {
+	    if (!score[i]) continue;
+	    candidate.push_back(i);
+	    score[i] += qlen * log(mu / (dlen[i] + mu));
+	}
+
+	// Rank documents based on scores
+	vector<unsigned int> rank;
+	copy(candidate.begin(), candidate.end(), back_inserter(rank));
+	stable_sort(rank.begin(), rank.end(), value_greater(score));
+	foreach (unsigned int doc_id, rank) {
+	    cout << topicno << ' ' << docno[doc_id] << ' ' << score[doc_id] << '\n';
+	}
+
+	// Now, produce facets
+	if (with_facet) {
+	    topicno += ":facet";
+
+	    // Reset counts
+	    fill(count.begin(), count.end(), 0);
+
+	    foreach (unsigned int doc_id, candidate) {
+		unsigned int nop1, ff; // Does `facet frequency' sound weird to you?
+		float nop2;
+		d2f_in.seekg(d2f_offset[doc_id]);
+		d2f_in >> unpack(nop1) >> unpack(nop2) >> unpack(ff);
+		for (unsigned int i = 0; i < ff; ++i) {
+		    unsigned int facet_id;
+		    d2f_in >> unpack(facet_id);
+		    ++count[facet_id];
+		}
+	    }
+
+	    // Copy non-zero id's
+	    vector<unsigned int> facet_candidate;
+
+	    for (unsigned int i = 1; i <= F; ++i) {
+		if (!count[i]) continue;
+		facet_candidate.push_back(i);
+	    }
+
+	    stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(count));
+	    foreach (unsigned int facet_id, facet_candidate) {
+		cout << topicno << ' ' << facet[facet_id] << ' ' << count[facet_id] << '\n';
+	    }
+	}
     }
 }
