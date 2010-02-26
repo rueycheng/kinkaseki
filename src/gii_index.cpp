@@ -130,8 +130,8 @@ namespace std {
 //-------------------------------------------------- 
 namespace fs = boost::filesystem;
 
-void create_model(fs::path& basedir);
-void query_model(fs::path& basedir);
+void create_model(fs::path&);
+void query_model(fs::path&, bool);
 
 //--------------------------------------------------
 // Main program
@@ -142,6 +142,7 @@ int main(int argc, char** argv) {
 
     Getopt g(argc, argv);
     g   << $("query", "Query the model")
+	<< $("with-facet", "Return facets (with --query)")
 	<< $(&model, "model,m", "Specify the model directory")
 	<< $$$("");
 
@@ -151,7 +152,7 @@ int main(int argc, char** argv) {
     fs::path basedir(model);
 
     if (!g["query"]) create_model(basedir);
-    else query_model(basedir);
+    else query_model(basedir, g["with-facet"]);
 
     return 0;
 }
@@ -291,17 +292,34 @@ void create_model(fs::path& basedir) {
 //--------------------------------------------------
 // Case 2:  Query the model
 //-------------------------------------------------- 
-void query_model(fs::path& basedir) {
-    unordered_map<string, unsigned int> vocab;
-
+void query_model(fs::path& basedir, bool with_facet) {
     // Load vocab
+    unordered_map<string, unsigned int> vocab;
+    unsigned int T;
+
     {
 	fs::ifstream vocab_in(basedir / "vocab");
 	cerr << "Load " << basedir / "vocab" << '\n';
 
 	string t;
 	unsigned int id = 0;
-	while (getline(vocab_in, t)) vocab[t] = ++id;
+
+	vocab_in >> T;
+	while (vocab_in >> t) vocab[t] = ++id;
+    }
+
+    // Load docno
+    unsigned int N;
+    vector<string> docno;
+
+    {
+	fs::ifstream docno_in(basedir / "docno");
+	cerr << "Load " << basedir / "docno" << '\n';
+
+	string t;
+
+	docno_in >> N;
+	while (docno_in >> t) docno.push_back(t);
     }
 
     // Now work with cin
