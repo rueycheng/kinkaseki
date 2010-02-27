@@ -450,6 +450,21 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	// Reset the accumulators
 	fill(score.begin(), score.end(), 0.0);
 
+	//--------------------------------------------------
+	// Tthe full-blown scoring function
+	//
+	// \log \Pr(Q|d) = \sum_{q \in Q \cap d} \log(1 + f_{q,d} |C| / \mu f_q)    ...(1)
+	//               + |Q| \log \mu - |Q| \log |C| + \sum_{q \in Q} \log f_q    ...(2)
+	//               - |Q| \log(|d| + \mu)                                      ...(3)
+	//
+	// NOTE: (1) is done in posting-list traversal,
+	//       (2) is a globally-determined constant in the session,
+	//       and (3) is a document-dependent normalizing factor.
+	//--------------------------------------------------
+	
+	// Placeholder for the result of (2)
+	float sum_of_logtf = 0.0;
+
 	// Iterate through each term
 	foreach (unsigned int term_id, query) {
 	    if (term_id == 0) continue;
@@ -460,21 +475,31 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	    unsigned int df, tf;
 	    t2d_in >> unpack(df) >> unpack(tf);
 
+	    // Accumulate counts for computation of (2)
+	    sum_of_logtf += log(tf);
+
 	    for (unsigned int i = 0; i < df; ++i) {
 		unsigned int doc_id, count;
 		t2d_in >> unpack(doc_id) >> unpack(count);
+
+		// Compute (1)
 		score[doc_id] += log(1 + float(count * L) / (mu * tf));
 	    }
 	}
 
-	// Collect non-zero id's
+	// Actually, (2) is not necessary here (even in the later facet ranking)
 	unsigned int qlen = query.size();
+
+	// Collect non-zero id's
 	vector<unsigned int> rank;
 
 	for (unsigned int i = 1; i <= N; ++i) {
 	    if (!score[i]) continue;
 	    rank.push_back(i);
-	    score[i] += qlen * log(mu / (dlen[i] + mu));
+
+
+	    // Add (3) back in
+	    score[i] -= qlen * log(dlen[i] + mu);
 	}
 
 	// Make a copy for faster facet lookup
