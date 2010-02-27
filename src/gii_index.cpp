@@ -161,18 +161,21 @@ namespace std {
 namespace fs = boost::filesystem;
 
 void create_model(fs::path&);
-void query_model(fs::path&, bool);
+void query_model(fs::path&, bool, unsigned int, unsigned int);
 
 //--------------------------------------------------
 // Main program
 //-------------------------------------------------- 
 int main(int argc, char** argv) {
     // Getopt
+    unsigned int top_n = 1000, top_m = 100;
     string model = "model.unnamed";
 
     Getopt g(argc, argv);
     g   << $("query", "Query the model")
 	<< $("with-facet", "Return facets (with --query)")
+	<< $(&top_n, "top-document,n", "Retrieve only top N results (with --query)")
+	<< $(&top_m, "top-facet,m", "Retrieve only top M facet results (with --query)")
 	<< $(&model, "model,m", "Specify the model directory")
 	<< $$$("");
 
@@ -182,7 +185,7 @@ int main(int argc, char** argv) {
     fs::path basedir(model);
 
     if (!g["query"]) create_model(basedir);
-    else query_model(basedir, g["with-facet"]);
+    else query_model(basedir, g["with-facet"], top_n, top_m);
 
     return 0;
 }
@@ -332,7 +335,7 @@ void create_model(fs::path& basedir) {
 //--------------------------------------------------
 // Case 2:  Query the model
 //-------------------------------------------------- 
-void query_model(fs::path& basedir, bool with_facet) {
+void query_model(fs::path& basedir, bool with_facet, unsigned int top_n, unsigned int top_m) {
     // Load vocab
     unordered_map<string, unsigned int> vocab;
     unsigned int T;
@@ -464,16 +467,29 @@ void query_model(fs::path& basedir, bool with_facet) {
 
 	// Collect non-zero id's
 	unsigned int qlen = query.size();
-	vector<unsigned int> candidate;
+	vector<unsigned int> rank;
+
 	for (unsigned int i = 1; i <= N; ++i) {
 	    if (!score[i]) continue;
-	    candidate.push_back(i);
+	    rank.push_back(i);
 	    score[i] += qlen * log(mu / (dlen[i] + mu));
 	}
 
-	// Rank documents based on scores
-	vector<unsigned int> rank;
-	copy(candidate.begin(), candidate.end(), back_inserter(rank));
+	// Make a copy for faster facet lookup
+	vector<unsigned int> copied;
+
+	if (top_n == 0 || rank.size() <= top_n) {
+	    // Now copy as it is
+	    copy(rank.begin(), rank.end(), back_inserter(copied));
+	}
+	else {
+	    // HACK: Now we need to copy the top N stuff back into candidates, in ascending order
+	    nth_element(rank.begin(), rank.begin() + top_n, rank.end(), value_greater(score));
+	    rank.erase(rank.begin() + top_n, rank.end());
+	    copy(rank.begin(), rank.end(), back_inserter(copied));
+	    stable_sort(copied.begin(), copied.end());
+	}
+
 	stable_sort(rank.begin(), rank.end(), value_greater(score));
 	foreach (unsigned int doc_id, rank) {
 	    cout << topicno << ' ' << docno[doc_id] << ' ' << score[doc_id] << '\n';
@@ -486,7 +502,7 @@ void query_model(fs::path& basedir, bool with_facet) {
 	    // Reset counts
 	    fill(count.begin(), count.end(), 0);
 
-	    foreach (unsigned int doc_id, candidate) {
+	    foreach (unsigned int doc_id, copied) {
 		unsigned int nop1, ff; // Does `facet frequency' sound weird to you?
 		float nop2;
 		d2f_in.seekg(d2f_offset[doc_id]);
@@ -504,6 +520,12 @@ void query_model(fs::path& basedir, bool with_facet) {
 	    for (unsigned int i = 1; i <= F; ++i) {
 		if (!count[i]) continue;
 		facet_candidate.push_back(i);
+	    }
+
+	    if (top_m != 0 && facet_candidate.size() > top_m) {
+		nth_element(facet_candidate.begin(), facet_candidate.begin() + top_m,
+			facet_candidate.end(), value_greater(count));
+		facet_candidate.erase(facet_candidate.begin() + top_m, facet_candidate.end());
 	    }
 
 	    stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(count));
