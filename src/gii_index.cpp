@@ -175,6 +175,7 @@ int main(int argc, char** argv) {
     g   << $("query", "Query the model")
 	<< $("no-result", "Do not return results (with --query)")
 	<< $("no-facet", "Do not return facets (with --query)")
+	<< $("silent", "Turn off error reporting")
 	<< $(&top_n, "top-document,n", "Retrieve only top N results (with --query)")
 	<< $(&top_m, "top-facet,m", "Retrieve only top M facet results (with --query)")
 	<< $(&model, "model,m", "Specify the model directory")
