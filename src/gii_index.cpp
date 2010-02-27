@@ -161,7 +161,7 @@ namespace std {
 namespace fs = boost::filesystem;
 
 void create_model(fs::path&);
-void query_model(fs::path&, bool, unsigned int, unsigned int);
+void query_model(fs::path&, bool, bool, unsigned int, unsigned int);
 
 //--------------------------------------------------
 // Main program
@@ -173,7 +173,8 @@ int main(int argc, char** argv) {
 
     Getopt g(argc, argv);
     g   << $("query", "Query the model")
-	<< $("with-facet", "Return facets (with --query)")
+	<< $("no-result", "Do not return results (with --query)")
+	<< $("no-facet", "Do not return facets (with --query)")
 	<< $(&top_n, "top-document,n", "Retrieve only top N results (with --query)")
 	<< $(&top_m, "top-facet,m", "Retrieve only top M facet results (with --query)")
 	<< $(&model, "model,m", "Specify the model directory")
@@ -185,7 +186,7 @@ int main(int argc, char** argv) {
     fs::path basedir(model);
 
     if (!g["query"]) create_model(basedir);
-    else query_model(basedir, g["with-facet"], top_n, top_m);
+    else query_model(basedir, g["no-result"], g["no-facet"], top_n, top_m);
 
     return 0;
 }
@@ -335,7 +336,7 @@ void create_model(fs::path& basedir) {
 //--------------------------------------------------
 // Case 2:  Query the model
 //-------------------------------------------------- 
-void query_model(fs::path& basedir, bool with_facet, unsigned int top_n, unsigned int top_m) {
+void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int top_n, unsigned int top_m) {
     // Load vocab
     unordered_map<string, unsigned int> vocab;
     unsigned int T;
@@ -490,48 +491,50 @@ void query_model(fs::path& basedir, bool with_facet, unsigned int top_n, unsigne
 	    stable_sort(copied.begin(), copied.end());
 	}
 
-	stable_sort(rank.begin(), rank.end(), value_greater(score));
-	foreach (unsigned int doc_id, rank) {
-	    cout << topicno << ' ' << docno[doc_id] << ' ' << score[doc_id] << '\n';
+	// NOTE: I made it a little bit weird here.  Should subject to change.
+	if (!no_result) {
+	    stable_sort(rank.begin(), rank.end(), value_greater(score));
+	    foreach (unsigned int doc_id, rank) {
+		cout << topicno << ' ' << docno[doc_id] << ' ' << score[doc_id] << '\n';
+	    }
 	}
 
-	// Now, produce facets
-	if (with_facet) {
-	    topicno += ":facet";
+	// Now, produce facets if you will
+	if (no_facet) return;
+	
+	// Reset counts
+	topicno += ":facet";
+	fill(count.begin(), count.end(), 0);
 
-	    // Reset counts
-	    fill(count.begin(), count.end(), 0);
-
-	    foreach (unsigned int doc_id, copied) {
-		unsigned int nop1, ff; // Does `facet frequency' sound weird to you?
-		float nop2;
-		d2f_in.seekg(d2f_offset[doc_id]);
-		d2f_in >> unpack(nop1) >> unpack(nop2) >> unpack(ff);
-		for (unsigned int i = 0; i < ff; ++i) {
-		    unsigned int facet_id;
-		    d2f_in >> unpack(facet_id);
-		    ++count[facet_id];
-		}
+	foreach (unsigned int doc_id, copied) {
+	    unsigned int nop1, ff; // Does `facet frequency' sound weird to you?
+	    float nop2;
+	    d2f_in.seekg(d2f_offset[doc_id]);
+	    d2f_in >> unpack(nop1) >> unpack(nop2) >> unpack(ff);
+	    for (unsigned int i = 0; i < ff; ++i) {
+		unsigned int facet_id;
+		d2f_in >> unpack(facet_id);
+		++count[facet_id];
 	    }
+	}
 
-	    // Copy non-zero id's
-	    vector<unsigned int> facet_candidate;
+	// Copy non-zero id's
+	vector<unsigned int> facet_candidate;
 
-	    for (unsigned int i = 1; i <= F; ++i) {
-		if (!count[i]) continue;
-		facet_candidate.push_back(i);
-	    }
+	for (unsigned int i = 1; i <= F; ++i) {
+	    if (!count[i]) continue;
+	    facet_candidate.push_back(i);
+	}
 
-	    if (top_m != 0 && facet_candidate.size() > top_m) {
-		nth_element(facet_candidate.begin(), facet_candidate.begin() + top_m,
-			facet_candidate.end(), value_greater(count));
-		facet_candidate.erase(facet_candidate.begin() + top_m, facet_candidate.end());
-	    }
+	if (top_m != 0 && facet_candidate.size() > top_m) {
+	    nth_element(facet_candidate.begin(), facet_candidate.begin() + top_m,
+		    facet_candidate.end(), value_greater(count));
+	    facet_candidate.erase(facet_candidate.begin() + top_m, facet_candidate.end());
+	}
 
-	    stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(count));
-	    foreach (unsigned int facet_id, facet_candidate) {
-		cout << topicno << ' ' << facet[facet_id] << ' ' << count[facet_id] << '\n';
-	    }
+	stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(count));
+	foreach (unsigned int facet_id, facet_candidate) {
+	    cout << topicno << ' ' << facet[facet_id] << ' ' << count[facet_id] << '\n';
 	}
     }
 }
