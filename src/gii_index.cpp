@@ -387,8 +387,13 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
     vector<float> score;
     score.resize(N + 1);
 
-    vector<unsigned short> count;
-    count.resize(F + 1);
+    vector<unsigned short> facet_count;
+    facet_count.resize(F + 1);
+
+    vector<float> facet_rank;
+    vector<float> facet_norm;
+    facet_rank.resize(F + 1);
+    facet_norm.resize(F + 1);
 
     // Load t2d offset
     fs::ifstream t2d_in(basedir / "t2d");
@@ -528,9 +533,10 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	// Now, produce facets if you will
 	if (no_facet) return;
 	
-	// Reset counts
-	topicno += ":facet";
-	fill(count.begin(), count.end(), 0);
+	// Reset facet_counts
+	fill(facet_count.begin(), facet_count.end(), 0);
+	fill(facet_rank.begin(), facet_rank.end(), 0.0);
+	fill(facet_norm.begin(), facet_norm.end(), 0.0);
 
 	foreach (unsigned int doc_id, copied) {
 	    unsigned int nop1, ff; // Does `facet frequency' sound weird to you?
@@ -540,27 +546,61 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	    for (unsigned int i = 0; i < ff; ++i) {
 		unsigned int facet_id;
 		d2f_in >> unpack(facet_id);
-		++count[facet_id];
+
+		//--------------------------------------------------
+		// Phase 1: counts
+		//-------------------------------------------------- 
+		++facet_count[facet_id];
+
+		 //--------------------------------------------------
+		// Phase 2: rank
+		//-------------------------------------------------- 
+		facet_rank[facet_id] += exp(score[doc_id]) * (1.0 / ff);
+		facet_norm[facet_id] += (1.0 / ff);
 	    }
 	}
 
-	// Copy non-zero id's
+	//--------------------------------------------------
+	// Output results for counts
+	//-------------------------------------------------- 
 	vector<unsigned int> facet_candidate;
 
 	for (unsigned int i = 1; i <= F; ++i) {
-	    if (!count[i]) continue;
+	    if (!facet_count[i]) continue;
 	    facet_candidate.push_back(i);
 	}
 
 	if (top_m != 0 && facet_candidate.size() > top_m) {
 	    nth_element(facet_candidate.begin(), facet_candidate.begin() + top_m,
-		    facet_candidate.end(), value_greater(count));
+		    facet_candidate.end(), value_greater(facet_count));
 	    facet_candidate.erase(facet_candidate.begin() + top_m, facet_candidate.end());
 	}
 
-	stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(count));
+	stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(facet_count));
 	foreach (unsigned int facet_id, facet_candidate) {
-	    cout << topicno << ' ' << facet[facet_id] << ' ' << count[facet_id] << '\n';
+	    cout << topicno << ":facet-count" << ' ' << facet[facet_id] << ' ' << facet_count[facet_id] << '\n';
+	}
+	
+	//--------------------------------------------------
+	// Do it all over again for ranks
+	//-------------------------------------------------- 
+	facet_candidate.clear();
+
+	for (unsigned int i = 1; i <= F; ++i) {
+	    if (!facet_norm[i]) continue;
+	    facet_candidate.push_back(i);
+	    facet_rank[i] = log(facet_rank[i]) - log(facet_norm[i]);
+	}
+
+	if (top_m != 0 && facet_candidate.size() > top_m) {
+	    nth_element(facet_candidate.begin(), facet_candidate.begin() + top_m,
+		    facet_candidate.end(), value_greater(facet_rank));
+	    facet_candidate.erase(facet_candidate.begin() + top_m, facet_candidate.end());
+	}
+
+	stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(facet_rank));
+	foreach (unsigned int facet_id, facet_candidate) {
+	    cout << topicno << ":facet-rank" << ' ' << facet[facet_id] << ' ' << facet_rank[facet_id] << '\n';
 	}
     }
 }
