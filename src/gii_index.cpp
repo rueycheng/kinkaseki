@@ -588,6 +588,7 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 
 	for (unsigned int i = 1; i <= F; ++i) {
 	    if (!facet_norm[i]) continue;
+	    if (facet_count[i] < 2) continue;
 	    facet_candidate.push_back(i);
 	    facet_rank[i] = log(facet_rank[i]) - log(facet_norm[i]);
 	}
@@ -600,7 +601,7 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 
 	stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(facet_rank));
 	foreach (unsigned int facet_id, facet_candidate) {
-	    cout << topicno << ":facet-rank" << ' ' << facet[facet_id] << ' ' << facet_rank[facet_id] << '\n';
+	    cout << topicno << ":facet-rank" << ' ' << facet[facet_id] << ' ' << facet_rank[facet_id] << ' ' << facet_count[facet_id] << '\n';
 	}
     }
 }
