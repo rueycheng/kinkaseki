@@ -202,6 +202,8 @@ void create_model(fs::path& basedir) {
 
     unordered_map<string, unsigned int> facets; // An id-lookup table for facets
     vector<string> facets_fwd;
+    vector<unsigned int> facets_count;
+    unsigned int collectionfacetlen = 0; // Arrgh, what a tricky name!
     unsigned int collectionlen = 0;
 
     // Now work with cin (I hate over-indented codes)
@@ -249,9 +251,13 @@ void create_model(fs::path& basedir) {
 	    while (iss >> f) {
 		if (facets.find(f) == facets.end()) {
 		    facets_fwd.push_back(f);
+		    facets_count.push_back(0);
 		    facets[f] = facets_fwd.size();
 		}
+
 		current.add(facets[f]);
+		++facets_count[facets[f] - 1]; // HACK: Facet ID starts from 1
+		++collectionfacetlen;
 	    }
 	}
     }
@@ -289,6 +295,11 @@ void create_model(fs::path& basedir) {
 
 	facet_out << facets_fwd.size() << '\n';
 	foreach (const string& facet, facets_fwd) { facet_out << facet << '\n'; }
+	//--------------------------------------------------
+	// NOTE: I put counts also in here for being lazy
+	//-------------------------------------------------- 
+	facet_out << collectionfacetlen << '\n';
+	foreach (const unsigned int count, facets_count) { facet_out << count << '\n'; }
     }
 
     // Output t2d (binary)
@@ -370,17 +381,30 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 
     // Load facet
     unsigned int F;
+    unsigned int Lf;
     vector<string> facet;
+    vector<unsigned int> facet_prior_count; // Arrg.  Bad naming (subject to change)!
 
     {
 	fs::ifstream facet_in(basedir / "facet");
 	cerr << "Load " << basedir / "facet" << '\n';
 
 	string t;
+	unsigned int u;
 
 	facet_in >> F;
 	facet.push_back("<unk>");
-	while (facet_in >> t) facet.push_back(t);
+	for (unsigned int i = 0; i < F; ++i) {
+	    facet_in >> t;
+	    facet.push_back(t);
+	}
+
+	facet_in >> Lf;
+	facet_prior_count.push_back(0);
+	for (unsigned int i = 0; i < F; ++i) {
+	    facet_in >> u; 
+	    facet_prior_count.push_back(u);
+	}
     }
 
     // Score accumulator (`brute-force')
@@ -390,10 +414,21 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
     vector<unsigned short> facet_count;
     facet_count.resize(F + 1);
 
+    //--------------------------------------------------
+    // The birth of mess...
+    //-------------------------------------------------- 
     vector<float> facet_rank;
     vector<float> facet_norm;
     facet_rank.resize(F + 1);
     facet_norm.resize(F + 1);
+
+    vector<float> facet_smooth_nom;
+    vector<float> facet_smooth_denom;
+    facet_smooth_nom.resize(F + 1);
+    facet_smooth_denom.resize(F + 1);
+    
+    vector<float> Kf;
+    Kf.resize(F + 1);
 
     // Load t2d offset
     fs::ifstream t2d_in(basedir / "t2d");
@@ -428,6 +463,7 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 
     // HACK: They said programmers are lazy people
     const float mu = 2500.0;
+    const float mu2 = 5.0; // Let's start the same
 
     // Now, we are ready to work with queries
     unsigned int topic_id = 0;
@@ -442,21 +478,28 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	// Make sure we had a good topic number
 	vector<unsigned int> query;
 
-	if (boost::ends_with(topicno, ":topic")) strip_after_first(topicno, ':');
-	else {
-	    query.push_back(lookup(vocab, 0)(topicno)); // Otherwise, throw it back into the query
-	    topicno = str(boost::format("%03d") % topic_id);
-	}
+	// NOTE: Now, the first token has to be the topic number
+	//--------------------------------------------------
+	// if (boost::ends_with(topicno, ":topic")) strip_after_first(topicno, ':');
+	// else {
+	//     query.push_back(lookup(vocab, 0)(topicno)); // Otherwise, throw it back into the query
+	//     topicno = str(boost::format("%03d") % topic_id);
+	// }
+	//-------------------------------------------------- 
 
 	// Read the rest of the query
 	transform(istream_iterator<string>(iss), istream_iterator<string>(), 
 		back_inserter(query), lookup(vocab, 0));
 
+	//--------------------------------------------------
+	// Step 1: Documents
+	//-------------------------------------------------- 
+	
 	// Reset the accumulators
 	fill(score.begin(), score.end(), 0.0);
 
 	//--------------------------------------------------
-	// Tthe full-blown scoring function
+	// The full-blown scoring function
 	//
 	// \log \Pr(Q|d) = \sum_{q \in Q \cap d} \log(1 + f_{q,d} |C| / \mu f_q)    ...(1)
 	//               + |Q| \log \mu - |Q| \log |C| + \sum_{q \in Q} \log f_q    ...(2)
@@ -502,7 +545,6 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	    if (!score[i]) continue;
 	    rank.push_back(i);
 
-
 	    // Add (3) back in
 	    score[i] -= qlen * log(dlen[i] + mu);
 	}
@@ -533,16 +575,34 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	// Now, produce facets if you will
 	if (no_facet) return;
 	
+	//--------------------------------------------------
+	// Step 2: Facets
+	//-------------------------------------------------- 
+	
 	// Reset facet_counts
 	fill(facet_count.begin(), facet_count.end(), 0);
 	fill(facet_rank.begin(), facet_rank.end(), 0.0);
 	fill(facet_norm.begin(), facet_norm.end(), 0.0);
+	fill(facet_smooth_nom.begin(), facet_smooth_nom.end(), 0.0);
+	fill(facet_smooth_denom.begin(), facet_smooth_denom.end(), 0.0);
+	fill(Kf.begin(), Kf.end(), 0.0);
+
+	// Global penalty goes here
+	float global_nom = 0.0;
+	float global_denom = 0.0;
 
 	foreach (unsigned int doc_id, copied) {
 	    unsigned int nop1, ff; // Does `facet frequency' sound weird to you?
 	    float nop2;
 	    d2f_in.seekg(d2f_offset[doc_id]);
 	    d2f_in >> unpack(nop1) >> unpack(nop2) >> unpack(ff);
+
+	    float r = 1.0 / (mu2 + ff); // For smooth
+	    float score_r = exp(score[doc_id]) * r; // For smooth
+
+	    global_nom += score_r;
+	    global_denom += r;
+
 	    for (unsigned int i = 0; i < ff; ++i) {
 		unsigned int facet_id;
 		d2f_in >> unpack(facet_id);
@@ -552,11 +612,19 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 		//-------------------------------------------------- 
 		++facet_count[facet_id];
 
-		 //--------------------------------------------------
+		//--------------------------------------------------
 		// Phase 2: rank
 		//-------------------------------------------------- 
 		facet_rank[facet_id] += exp(score[doc_id]) * (1.0 / ff);
 		facet_norm[facet_id] += (1.0 / ff);
+
+		//--------------------------------------------------
+		// Phase 3: smoothed
+		//-------------------------------------------------- 
+		if (Kf[facet_id] == 0.0) Kf[facet_id] = mu2 * float(facet_prior_count[facet_id]) / Lf;
+		    
+		facet_smooth_nom[facet_id] += score_r;
+		facet_smooth_denom[facet_id] += r;
 	    }
 	}
 
@@ -590,7 +658,7 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	    if (!facet_norm[i]) continue;
 	    if (facet_count[i] < 2) continue;
 	    facet_candidate.push_back(i);
-	    facet_rank[i] = log(facet_rank[i]) - log(facet_norm[i]);
+	    facet_rank[i] = facet_rank[i] / facet_norm[i];
 	}
 
 	if (top_m != 0 && facet_candidate.size() > top_m) {
@@ -601,7 +669,36 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 
 	stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(facet_rank));
 	foreach (unsigned int facet_id, facet_candidate) {
-	    cout << topicno << ":facet-rank" << ' ' << facet[facet_id] << ' ' << facet_rank[facet_id] << ' ' << facet_count[facet_id] << '\n';
+	    cout << topicno << ":facet-rank" << ' ' << facet[facet_id] << ' ' 
+		<< facet_rank[facet_id] << ' ' << facet_count[facet_id] << '\n';
 	}
+
+	//--------------------------------------------------
+	// And the same thing for smooth
+	//-------------------------------------------------- 
+	facet_candidate.clear();
+
+	for (unsigned int i = 1; i <= F; ++i) {
+	    if (!Kf[i]) continue;
+	    if (facet_count[i] < 2) continue;
+	    facet_candidate.push_back(i);
+	    facet_smooth_nom[i] += Kf[i] * global_nom;
+	    facet_smooth_denom[i] += Kf[i] * global_denom;
+	    facet_rank[i] = facet_smooth_nom[i] / facet_smooth_denom[i];
+	}
+	
+	// Shameless copy my own code...
+	if (top_m != 0 && facet_candidate.size() > top_m) {
+	    nth_element(facet_candidate.begin(), facet_candidate.begin() + top_m,
+		    facet_candidate.end(), value_greater(facet_rank));
+	    facet_candidate.erase(facet_candidate.begin() + top_m, facet_candidate.end());
+	}
+
+	stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(facet_rank));
+	foreach (unsigned int facet_id, facet_candidate) {
+	    cout << topicno << ":facet-smooth" << ' ' << facet[facet_id] << ' ' 
+		<< facet_rank[facet_id] << ' ' << facet_count[facet_id] << '\n';
+	}
+
     }
 }
