@@ -53,8 +53,8 @@ int main(int argc, char** argv) {
 
     Getopt g(argc, argv);
     g   << $("bypass", "Do not tokenize or perform lemmatization")
+	<< $("stem", "Explicitly lemmatize all the tokens")
 	<< $("keep-case", "Do not lowercase")
-	<< $("keep-unstemmed", "Do not lemmatize")
 	<< $("keep-stopword", "Do not remove stopword")
 	<< $("keep-short-word", "Do not remove short words (size < 3)")
 	<< $("keep-long-word", "Do not remove long words (size > 25)")
@@ -128,7 +128,7 @@ int main(int argc, char** argv) {
 			if (!g["keep-short-word"] && t.size() < 3) continue;
 			if (!g["keep-long-word"] && t.size() > 25) continue;
 
-			if (g["keep-unstemmed"]) cout << ' ' << t;
+			if (!g["stem"]) cout << ' ' << t;
 			else {
 			    if ((t[0] & 0x80) == 0x00) cout << ' ' << ps.stem(t);
 			    else cout << ' ' << t;
