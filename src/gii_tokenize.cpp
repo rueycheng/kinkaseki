@@ -116,9 +116,12 @@ int main(int argc, char** argv) {
 
 		cout << id;
 		if (boost::ends_with(id, ":facet")) {
-		    typedef boost::tokenizer<> DefaultTokenizer;
-		    DefaultTokenizer tok(line);
-		    foreach (const string& t, tok) { cout << ' ' << t; }
+		    cout << line;
+		//--------------------------------------------------
+		//     typedef boost::tokenizer<> DefaultTokenizer;
+		//     DefaultTokenizer tok(line);
+		//     foreach (const string& t, tok) { cout << ' ' << t; }
+		//-------------------------------------------------- 
 		}
 		else {
 		    boost::to_lower(line);
