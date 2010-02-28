@@ -161,7 +161,7 @@ namespace std {
 namespace fs = boost::filesystem;
 
 void create_model(fs::path&);
-void query_model(fs::path&, bool, bool, unsigned int, unsigned int, float, float);
+void query_model(fs::path&, bool, bool, unsigned int, unsigned int, float, float, unsigned int);
 
 //--------------------------------------------------
 // Main program
@@ -170,6 +170,7 @@ int main(int argc, char** argv) {
     // Getopt
     unsigned int top_n = 1000, top_m = 100;
     float mu = 2500.0, mu2 = 20.0;
+    unsigned int min_support = 1;
     string model = "model.unnamed";
 
     Getopt g(argc, argv);
@@ -180,6 +181,7 @@ int main(int argc, char** argv) {
 	<< $("force", "Force override existing model")
 	<< $(&mu, "mu", "Set parameter mu (defaults 2500.0)")
 	<< $(&mu2, "mu2", "Set parameter mu2 (defaults 20.0)")
+	<< $(&min_support, "min-support", "Set minimum support for facets (defaults 1)")
 	<< $(&top_n, "top-document,n", "Retrieve only top N results (with --query)")
 	<< $(&top_m, "top-facet,m", "Retrieve only top M facet results (with --query)")
 	<< $(&model, "model,m", "Specify the model directory")
@@ -194,7 +196,7 @@ int main(int argc, char** argv) {
     fs::path basedir(model);
 
     if (!g["query"]) create_model(basedir);
-    else query_model(basedir, g["no-result"], g["no-facet"], top_n, top_m, mu, mu2);
+    else query_model(basedir, g["no-result"], g["no-facet"], top_n, top_m, mu, mu2, min_support);
 
     return 0;
 }
@@ -356,7 +358,7 @@ void create_model(fs::path& basedir) {
 // Case 2:  Query the model
 //-------------------------------------------------- 
 void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int top_n, 
-	unsigned int top_m, float mu, float mu2) 
+	unsigned int top_m, float mu, float mu2, unsigned int min_support) 
 {
     // Load vocab
     unordered_map<string, unsigned int> vocab;
@@ -661,7 +663,7 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 
 	for (unsigned int i = 1; i <= F; ++i) {
 	    if (!facet_norm[i]) continue;
-	    if (facet_count[i] < 2) continue;
+	    if (facet_count[i] < min_support) continue;
 	    facet_candidate.push_back(i);
 	    facet_rank[i] = facet_rank[i] / facet_norm[i];
 	}
@@ -685,7 +687,7 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 
 	for (unsigned int i = 1; i <= F; ++i) {
 	    if (!Kf[i]) continue;
-	    if (facet_count[i] < 2) continue; // Gotta keep this `min-support' filter here for a while
+	    if (facet_count[i] < min_support) continue; // Gotta keep this `min-support' filter here for a while
 	    facet_candidate.push_back(i);
 	    facet_smooth_nom[i] += Kf[i] * global_nom;
 	    facet_smooth_denom[i] += Kf[i] * global_denom;
