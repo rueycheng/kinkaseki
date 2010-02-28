@@ -680,7 +680,7 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 
 	for (unsigned int i = 1; i <= F; ++i) {
 	    if (!Kf[i]) continue;
-	    if (facet_count[i] < 2) continue;
+	    if (facet_count[i] < 2) continue; // Gotta keep this `min-support' filter here for a while
 	    facet_candidate.push_back(i);
 	    facet_smooth_nom[i] += Kf[i] * global_nom;
 	    facet_smooth_denom[i] += Kf[i] * global_denom;
