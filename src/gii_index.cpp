@@ -161,7 +161,7 @@ namespace std {
 namespace fs = boost::filesystem;
 
 void create_model(fs::path&);
-void query_model(fs::path&, bool, bool, unsigned int, unsigned int);
+void query_model(fs::path&, bool, bool, unsigned int, unsigned int, float, float);
 
 //--------------------------------------------------
 // Main program
@@ -169,6 +169,7 @@ void query_model(fs::path&, bool, bool, unsigned int, unsigned int);
 int main(int argc, char** argv) {
     // Getopt
     unsigned int top_n = 1000, top_m = 100;
+    float mu = 2500.0, mu2 = 20.0;
     string model = "model.unnamed";
 
     Getopt g(argc, argv);
@@ -177,6 +178,8 @@ int main(int argc, char** argv) {
 	<< $("no-facet", "Do not return facets (with --query)")
 	<< $("silent", "Turn off error reporting")
 	<< $("force", "Force override existing model")
+	<< $(&mu, "mu", "Set parameter mu (defaults 2500.0)")
+	<< $(&mu2, "mu2", "Set parameter mu2 (defaults 20.0)")
 	<< $(&top_n, "top-document,n", "Retrieve only top N results (with --query)")
 	<< $(&top_m, "top-facet,m", "Retrieve only top M facet results (with --query)")
 	<< $(&model, "model,m", "Specify the model directory")
@@ -191,7 +194,7 @@ int main(int argc, char** argv) {
     fs::path basedir(model);
 
     if (!g["query"]) create_model(basedir);
-    else query_model(basedir, g["no-result"], g["no-facet"], top_n, top_m);
+    else query_model(basedir, g["no-result"], g["no-facet"], top_n, top_m, mu, mu2);
 
     return 0;
 }
@@ -352,7 +355,9 @@ void create_model(fs::path& basedir) {
 //--------------------------------------------------
 // Case 2:  Query the model
 //-------------------------------------------------- 
-void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int top_n, unsigned int top_m) {
+void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int top_n, 
+	unsigned int top_m, float mu, float mu2) 
+{
     // Load vocab
     unordered_map<string, unsigned int> vocab;
     unsigned int T;
@@ -464,10 +469,6 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	fs::ifstream collection_in(basedir / "collection");
 	collection_in >> L;
     }
-
-    // HACK: They said programmers are lazy people
-    const float mu = 2500.0;
-    const float mu2 = 5.0; // Let's start the same
 
     // Now, we are ready to work with queries
     unsigned int topic_id = 0;
