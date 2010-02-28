@@ -176,14 +176,18 @@ int main(int argc, char** argv) {
 	<< $("no-result", "Do not return results (with --query)")
 	<< $("no-facet", "Do not return facets (with --query)")
 	<< $("silent", "Turn off error reporting")
+	<< $("force", "Force override existing model")
 	<< $(&top_n, "top-document,n", "Retrieve only top N results (with --query)")
 	<< $(&top_m, "top-facet,m", "Retrieve only top M facet results (with --query)")
 	<< $(&model, "model,m", "Specify the model directory")
 	<< $$$("");
 
     // Create model directory
+    if (!g["query"] && !g["force"] && fs::exists(model)) die("Use --force to override existing model");
+
     fs::create_directory(model);
     if (!fs::exists(model)) die("Cannot open directory " + model);
+
     fs::path basedir(model);
 
     if (!g["query"]) create_model(basedir);
