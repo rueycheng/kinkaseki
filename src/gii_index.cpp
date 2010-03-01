@@ -642,6 +642,7 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 
 	for (unsigned int i = 1; i <= F; ++i) {
 	    if (!facet_count[i]) continue;
+	    if (facet_count[i] < min_support) continue;
 	    facet_candidate.push_back(i);
 	}
 
@@ -665,7 +666,9 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	    if (!facet_norm[i]) continue;
 	    if (facet_count[i] < min_support) continue;
 	    facet_candidate.push_back(i);
-	    facet_rank[i] = facet_rank[i] / facet_norm[i];
+	    // Two flavor: Pr(Q|f) or Pr(f|Q)
+	    //facet_rank[i] = facet_rank[i] / facet_norm[i];
+	    facet_rank[i] = facet_rank[i];
 	}
 
 	if (top_m != 0 && facet_candidate.size() > top_m) {
@@ -691,7 +694,9 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	    facet_candidate.push_back(i);
 	    facet_smooth_nom[i] += Kf[i] * global_nom;
 	    facet_smooth_denom[i] += Kf[i] * global_denom;
-	    facet_rank[i] = facet_smooth_nom[i] / facet_smooth_denom[i];
+	    // Two flavor: Pr(Q|f) or Pr(f|Q)
+	    //facet_rank[i] = facet_smooth_nom[i] / facet_smooth_denom[i];
+	    facet_rank[i] = facet_smooth_nom[i];
 	}
 	
 	// Shameless copy my own code...
