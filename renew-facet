@@ -1,0 +1,6 @@
+#!/usr/bin/perl
+
+while (<>) {
+    s{<facet class="(.*?)">\s*(\S+?)</facet>}{<facet>$1:$2</facet>};
+    print;
+}
