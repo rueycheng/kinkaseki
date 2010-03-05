@@ -574,13 +574,16 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	// NOTE: I made it a little bit weird here.  Should subject to change.
 	if (!no_result) {
 	    stable_sort(rank.begin(), rank.end(), value_greater(score));
+
+	    unsigned int u = 0;
 	    foreach (unsigned int doc_id, rank) {
-		cout << topicno << ' ' << docno[doc_id] << ' ' << score[doc_id] << '\n';
+		cout << topicno << ' ' << "Q0" << ' ' << docno[doc_id] << ' ' 
+		    << ++u << ' ' << score[doc_id] << ' ' << "doc:lm" << '\n';
 	    }
 	}
 
 	// Now, produce facets if you will
-	if (no_facet) return;
+	if (no_facet) continue;
 	
 	//--------------------------------------------------
 	// Step 2: Facets
@@ -653,8 +656,13 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	}
 
 	stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(facet_count));
-	foreach (unsigned int facet_id, facet_candidate) {
-	    cout << topicno << ":facet-count" << ' ' << facet[facet_id] << ' ' << facet_count[facet_id] << '\n';
+
+	{
+	    unsigned int u = 0;
+	    foreach (unsigned int facet_id, facet_candidate) {
+		cout << topicno << ' ' << "Q0" << ' ' << facet[facet_id] << ' ' 
+		    << ++u << ' ' << facet_count[facet_id] << ' ' << "facet:count" << '\n';
+	    }
 	}
 	
 	//--------------------------------------------------
@@ -668,7 +676,7 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	    facet_candidate.push_back(i);
 	    // Two flavor: Pr(Q|f) or Pr(f|Q)
 	    //facet_rank[i] = facet_rank[i] / facet_norm[i];
-	    facet_rank[i] = facet_rank[i];
+	    facet_rank[i] = log(facet_rank[i]); // Output log score
 	}
 
 	if (top_m != 0 && facet_candidate.size() > top_m) {
@@ -678,9 +686,13 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	}
 
 	stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(facet_rank));
-	foreach (unsigned int facet_id, facet_candidate) {
-	    cout << topicno << ":facet-rank" << ' ' << facet[facet_id] << ' ' 
-		<< facet_rank[facet_id] << ' ' << facet_count[facet_id] << '\n';
+
+	{
+	    unsigned int u = 0;
+	    foreach (unsigned int facet_id, facet_candidate) {
+		cout << topicno << ' ' << "Q0" << ' ' << facet[facet_id] << ' ' 
+		    << ++u << ' ' << facet_rank[facet_id] << ' ' << "facet:rank" << ' ' << facet_count[facet_id] << '\n';
+	    }
 	}
 
 	//--------------------------------------------------
@@ -696,7 +708,7 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	    facet_smooth_denom[i] += Kf[i] * global_denom;
 	    // Two flavor: Pr(Q|f) or Pr(f|Q)
 	    //facet_rank[i] = facet_smooth_nom[i] / facet_smooth_denom[i];
-	    facet_rank[i] = facet_smooth_nom[i];
+	    facet_rank[i] = log(facet_smooth_nom[i]); // Output log score
 	}
 	
 	// Shameless copy my own code...
@@ -707,9 +719,13 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	}
 
 	stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(facet_rank));
-	foreach (unsigned int facet_id, facet_candidate) {
-	    cout << topicno << ":facet-smooth" << ' ' << facet[facet_id] << ' ' 
-		<< facet_rank[facet_id] << ' ' << facet_count[facet_id] << '\n';
+
+	{
+	    unsigned int u = 0;
+	    foreach (unsigned int facet_id, facet_candidate) {
+		cout << topicno << ' ' << "Q0" << ' ' << facet[facet_id] << ' ' 
+		    << ++u << ' ' << facet_rank[facet_id] << ' ' << "facet:dirichlet" << ' ' << facet_count[facet_id] << '\n';
+	    }
 	}
 
     }
