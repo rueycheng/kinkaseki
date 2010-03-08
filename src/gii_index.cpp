@@ -161,7 +161,7 @@ namespace std {
 namespace fs = boost::filesystem;
 
 void create_model(fs::path&);
-void query_model(fs::path&, bool, bool, unsigned int, unsigned int, float, float, float, unsigned int, string);
+void query_model(fs::path&, bool, bool, unsigned int, unsigned int, float, float, float, unsigned int, string, bool);
 
 //--------------------------------------------------
 // Main program
@@ -178,6 +178,7 @@ int main(int argc, char** argv) {
     g   << $("query", "Query the model")
 	<< $("no-result", "Do not return results (with --query)")
 	<< $("no-facet", "Do not return facets (with --query)")
+	<< $("normalize", "Prior-based normalization")
 	<< $("silent", "Turn off error reporting")
 	<< $("force", "Force override existing model")
 	<< $(&method, "method", "Specify facet ranking method: count, simple, dirichlet")
@@ -199,7 +200,8 @@ int main(int argc, char** argv) {
     fs::path basedir(model);
 
     if (!g["query"]) create_model(basedir);
-    else query_model(basedir, g["no-result"], g["no-facet"], top_n, top_m, mu, mu2, beta, min_support, method);
+    else query_model(basedir, g["no-result"], g["no-facet"], top_n, top_m, mu, mu2, beta, min_support, 
+	    method, g["normalize"]);
 
     return 0;
 }
@@ -361,7 +363,7 @@ void create_model(fs::path& basedir) {
 // Case 2:  Query the model
 //-------------------------------------------------- 
 void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int top_n, 
-	unsigned int top_m, float mu, float mu2, float beta, unsigned int min_support, string method) 
+	unsigned int top_m, float mu, float mu2, float beta, unsigned int min_support, string method, bool normalize) 
 {
     // Load vocab
     unordered_map<string, unsigned int> vocab;
@@ -585,144 +587,153 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	// Step 2: Facets
 	//-------------------------------------------------- 
 	
-	// Reset facet_counts
-	fill(facet_count.begin(), facet_count.end(), 0);
-	fill(facet_rank.begin(), facet_rank.end(), 0.0);
-	fill(facet_norm.begin(), facet_norm.end(), 0.0);
-	fill(facet_smooth_nom.begin(), facet_smooth_nom.end(), 0.0);
-	fill(facet_smooth_denom.begin(), facet_smooth_denom.end(), 0.0);
-	fill(Kf.begin(), Kf.end(), 0.0);
+	if (method == "count") {
+	    fill(facet_count.begin(), facet_count.end(), 0);
+	    foreach (unsigned int doc_id, copied) {
+		unsigned int nop1, ff; // Does `facet frequency' sound weird to you?
+		float nop2;
+		d2f_in.seekg(d2f_offset[doc_id]);
+		d2f_in >> unpack(nop1) >> unpack(nop2) >> unpack(ff);
+		for (unsigned int i = 0; i < ff; ++i) {
+		    unsigned int facet_id;
+		    d2f_in >> unpack(facet_id);
 
-	// Global penalty goes here
-	float global_nom = 0.0;
-	float global_denom = 0.0;
-
-	foreach (unsigned int doc_id, copied) {
-	    unsigned int nop1, ff; // Does `facet frequency' sound weird to you?
-	    float nop2;
-	    d2f_in.seekg(d2f_offset[doc_id]);
-	    d2f_in >> unpack(nop1) >> unpack(nop2) >> unpack(ff);
-
-	    float r = 1.0 / (mu2 + ff); // For smooth
-	    float score_r = exp(score[doc_id]) * r; // For smooth
-
-	    global_nom += score_r;
-	    global_denom += r;
-
-	    for (unsigned int i = 0; i < ff; ++i) {
-		unsigned int facet_id;
-		d2f_in >> unpack(facet_id);
-
-		//--------------------------------------------------
-		// Phase 1: counts
-		//-------------------------------------------------- 
-		++facet_count[facet_id];
-
-		//--------------------------------------------------
-		// Phase 2: rank
-		//-------------------------------------------------- 
-		facet_rank[facet_id] += exp(score[doc_id]) * (1.0 + beta) / (ff + F * beta);
-		facet_norm[facet_id] += (1.0 + beta) / (ff + F * beta);
-
-		//--------------------------------------------------
-		// Phase 3: smoothed
-		//-------------------------------------------------- 
-		if (Kf[facet_id] == 0.0) Kf[facet_id] = mu2 * float(facet_prior_count[facet_id]) / Lf;
-		    
-		facet_smooth_nom[facet_id] += score_r;
-		facet_smooth_denom[facet_id] += r;
+		    // Key step
+		    ++facet_count[facet_id];
+		}
 	    }
-	}
 
-	//--------------------------------------------------
-	// Output results for counts
-	//-------------------------------------------------- 
-	vector<unsigned int> facet_candidate;
+	    vector<unsigned int> facet_candidate;
+	    for (unsigned int i = 1; i <= F; ++i) {
+		if (facet_count[i] < min_support) continue;
+		facet_candidate.push_back(i);
+	    }
 
-	for (unsigned int i = 1; i <= F; ++i) {
-	    if (!facet_count[i]) continue;
-	    if (facet_count[i] < min_support) continue;
-	    facet_candidate.push_back(i);
-	}
+	    if (top_m != 0 && facet_candidate.size() > top_m) {
+		nth_element(facet_candidate.begin(), facet_candidate.begin() + top_m,
+			facet_candidate.end(), value_greater(facet_count));
+		facet_candidate.erase(facet_candidate.begin() + top_m, facet_candidate.end());
+	    }
 
-	if (top_m != 0 && facet_candidate.size() > top_m) {
-	    nth_element(facet_candidate.begin(), facet_candidate.begin() + top_m,
-		    facet_candidate.end(), value_greater(facet_count));
-	    facet_candidate.erase(facet_candidate.begin() + top_m, facet_candidate.end());
-	}
+	    stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(facet_count));
 
-	stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(facet_count));
-
-	{
 	    unsigned int u = 0;
 	    foreach (unsigned int facet_id, facet_candidate) {
 		cout << topicno << ' ' << "Q0" << ' ' << facet[facet_id] << ' ' 
 		    << ++u << ' ' << facet_count[facet_id] << ' ' << "facet:count" << '\n';
 	    }
 	}
-	
-	//--------------------------------------------------
-	// Do it all over again for ranks
-	//-------------------------------------------------- 
-	facet_candidate.clear();
+	else if (method == "simple") {
+	    fill(facet_count.begin(), facet_count.end(), 0);
+	    fill(facet_rank.begin(), facet_rank.end(), 0.0);
+	    fill(facet_norm.begin(), facet_norm.end(), 0.0);
+	    foreach (unsigned int doc_id, copied) {
+		unsigned int nop1, ff; // Does `facet frequency' sound weird to you?
+		float nop2;
+		d2f_in.seekg(d2f_offset[doc_id]);
+		d2f_in >> unpack(nop1) >> unpack(nop2) >> unpack(ff);
+		for (unsigned int i = 0; i < ff; ++i) {
+		    unsigned int facet_id;
+		    d2f_in >> unpack(facet_id);
 
-	for (unsigned int i = 1; i <= F; ++i) {
-	    if (!facet_norm[i]) continue;
-	    if (facet_count[i] < min_support) continue;
-	    facet_candidate.push_back(i);
-	    // Two flavor: Pr(Q|f) or Pr(f|Q)
-	    //facet_rank[i] = facet_rank[i] / facet_norm[i];
-	    facet_rank[i] = log(facet_rank[i]); // Output log score
-	}
+		    // Key step
+		    ++facet_count[facet_id];
+		    facet_rank[facet_id] += exp(score[doc_id]) * (1.0 + beta) / (ff + F * beta);
+		    facet_norm[facet_id] += (1.0 + beta) / (ff + F * beta);
+		}
+	    }
 
-	if (top_m != 0 && facet_candidate.size() > top_m) {
-	    nth_element(facet_candidate.begin(), facet_candidate.begin() + top_m,
-		    facet_candidate.end(), value_greater(facet_rank));
-	    facet_candidate.erase(facet_candidate.begin() + top_m, facet_candidate.end());
-	}
+	    vector<unsigned int> facet_candidate;
+	    for (unsigned int i = 1; i <= F; ++i) {
+		if (!facet_norm[i]) continue;
+		if (facet_count[i] < min_support) continue;
+		facet_candidate.push_back(i);
+		// Two flavor: Pr(Q|f) or Pr(f|Q)
+		facet_rank[i] = log(facet_rank[i]); // Output log score
+		if (normalize) facet_rank[i] -= log(facet_norm[i]);
+	    }
 
-	stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(facet_rank));
+	    if (top_m != 0 && facet_candidate.size() > top_m) {
+		nth_element(facet_candidate.begin(), facet_candidate.begin() + top_m,
+			facet_candidate.end(), value_greater(facet_rank));
+		facet_candidate.erase(facet_candidate.begin() + top_m, facet_candidate.end());
+	    }
 
-	{
+	    stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(facet_rank));
+
 	    unsigned int u = 0;
 	    foreach (unsigned int facet_id, facet_candidate) {
 		cout << topicno << ' ' << "Q0" << ' ' << facet[facet_id] << ' ' 
-		    << ++u << ' ' << facet_rank[facet_id] << ' ' << "facet:rank" << ' ' << facet_count[facet_id] << '\n';
+		    << ++u << ' ' << facet_rank[facet_id] << ' ' << "facet:simple" << ' ' 
+		    << facet_count[facet_id] << '\n';
 	    }
 	}
+	else if (method == "dirichlet") {
+	    fill(facet_count.begin(), facet_count.end(), 0);
+	    fill(facet_rank.begin(), facet_rank.end(), 0.0);
+	    fill(facet_norm.begin(), facet_norm.end(), 0.0);
+	    fill(facet_smooth_nom.begin(), facet_smooth_nom.end(), 0.0);
+	    fill(facet_smooth_denom.begin(), facet_smooth_denom.end(), 0.0);
+	    fill(Kf.begin(), Kf.end(), 0.0);
 
-	//--------------------------------------------------
-	// And the same thing for smooth
-	//-------------------------------------------------- 
-	facet_candidate.clear();
+	    // Global penalty goes here
+	    float global_nom = 0.0;
+	    float global_denom = 0.0;
 
-	for (unsigned int i = 1; i <= F; ++i) {
-	    if (!Kf[i]) continue;
-	    if (facet_count[i] < min_support) continue; // Gotta keep this `min-support' filter here for a while
-	    facet_candidate.push_back(i);
-	    facet_smooth_nom[i] += Kf[i] * global_nom;
-	    facet_smooth_denom[i] += Kf[i] * global_denom;
-	    // Two flavor: Pr(Q|f) or Pr(f|Q)
-	    //facet_rank[i] = facet_smooth_nom[i] / facet_smooth_denom[i];
-	    facet_rank[i] = log(facet_smooth_nom[i]); // Output log score
-	}
-	
-	// Shameless copy my own code...
-	if (top_m != 0 && facet_candidate.size() > top_m) {
-	    nth_element(facet_candidate.begin(), facet_candidate.begin() + top_m,
-		    facet_candidate.end(), value_greater(facet_rank));
-	    facet_candidate.erase(facet_candidate.begin() + top_m, facet_candidate.end());
-	}
+	    foreach (unsigned int doc_id, copied) {
+		unsigned int nop1, ff; // Does `facet frequency' sound weird to you?
+		float nop2;
+		d2f_in.seekg(d2f_offset[doc_id]);
+		d2f_in >> unpack(nop1) >> unpack(nop2) >> unpack(ff);
 
-	stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(facet_rank));
+		float r = 1.0 / (mu2 + ff); // For smooth
+		float score_r = exp(score[doc_id]) * r; // For smooth
 
-	{
+		global_nom += score_r;
+		global_denom += r;
+
+		for (unsigned int i = 0; i < ff; ++i) {
+		    unsigned int facet_id;
+		    d2f_in >> unpack(facet_id);
+
+		    // Key step
+		    ++facet_count[facet_id];
+		    if (Kf[facet_id] == 0.0) Kf[facet_id] = mu2 * float(facet_prior_count[facet_id]) / Lf;
+		    facet_smooth_nom[facet_id] += score_r;
+		    facet_smooth_denom[facet_id] += r;
+		}
+	    }
+
+	    vector<unsigned int> facet_candidate;
+	    for (unsigned int i = 1; i <= F; ++i) {
+		if (!Kf[i]) continue;
+		if (facet_count[i] < min_support) continue; // Gotta keep this `min-support' filter here for a while
+		facet_candidate.push_back(i);
+		facet_smooth_nom[i] += Kf[i] * global_nom;
+		facet_smooth_denom[i] += Kf[i] * global_denom;
+		// Two flavor: Pr(Q|f) or Pr(f|Q)
+		facet_rank[i] = log(facet_smooth_nom[i]); // Output log score
+		if (normalize) facet_rank[i] -= log(facet_smooth_denom[i]);
+	    }
+	    
+	    // Shameless copy my own code...
+	    if (top_m != 0 && facet_candidate.size() > top_m) {
+		nth_element(facet_candidate.begin(), facet_candidate.begin() + top_m,
+			facet_candidate.end(), value_greater(facet_rank));
+		facet_candidate.erase(facet_candidate.begin() + top_m, facet_candidate.end());
+	    }
+
+	    stable_sort(facet_candidate.begin(), facet_candidate.end(), value_greater(facet_rank));
+
 	    unsigned int u = 0;
 	    foreach (unsigned int facet_id, facet_candidate) {
 		cout << topicno << ' ' << "Q0" << ' ' << facet[facet_id] << ' ' 
-		    << ++u << ' ' << facet_rank[facet_id] << ' ' << "facet:dirichlet" << ' ' << facet_count[facet_id] << '\n';
+		    << ++u << ' ' << facet_rank[facet_id] << ' ' << "facet:dirichlet" << ' ' 
+		    << facet_count[facet_id] << '\n';
 	    }
 	}
-
+	else {
+	    cerr << "Something's wrong?" << '\n';
+	}
     }
 }
