@@ -161,7 +161,7 @@ namespace std {
 namespace fs = boost::filesystem;
 
 void create_model(fs::path&);
-void query_model(fs::path&, bool, bool, unsigned int, unsigned int, float, float, unsigned int);
+void query_model(fs::path&, bool, bool, unsigned int, unsigned int, float, float, float, unsigned int, string);
 
 //--------------------------------------------------
 // Main program
@@ -169,9 +169,10 @@ void query_model(fs::path&, bool, bool, unsigned int, unsigned int, float, float
 int main(int argc, char** argv) {
     // Getopt
     unsigned int top_n = 1000, top_m = 100;
-    float mu = 2500.0, mu2 = 20.0;
+    float mu = 2500.0, mu2 = 20.0, beta = 0.0;
     unsigned int min_support = 1;
     string model = "model.unnamed";
+    string method = "count";
 
     Getopt g(argc, argv);
     g   << $("query", "Query the model")
@@ -179,8 +180,10 @@ int main(int argc, char** argv) {
 	<< $("no-facet", "Do not return facets (with --query)")
 	<< $("silent", "Turn off error reporting")
 	<< $("force", "Force override existing model")
+	<< $(&method, "method", "Specify facet ranking method: count, simple, dirichlet")
 	<< $(&mu, "mu", "Set parameter mu (defaults 2500.0)")
 	<< $(&mu2, "mu2", "Set parameter mu2 (defaults 20.0)")
+	<< $(&beta, "beta", "Set parameter beta (defaults 0.0)")
 	<< $(&min_support, "min-support", "Set minimum support for facets (defaults 1)")
 	<< $(&top_n, "top-document,n", "Retrieve only top N results (with --query)")
 	<< $(&top_m, "top-facet,m", "Retrieve only top M facet results (with --query)")
@@ -196,7 +199,7 @@ int main(int argc, char** argv) {
     fs::path basedir(model);
 
     if (!g["query"]) create_model(basedir);
-    else query_model(basedir, g["no-result"], g["no-facet"], top_n, top_m, mu, mu2, min_support);
+    else query_model(basedir, g["no-result"], g["no-facet"], top_n, top_m, mu, mu2, beta, min_support, method);
 
     return 0;
 }
@@ -358,7 +361,7 @@ void create_model(fs::path& basedir) {
 // Case 2:  Query the model
 //-------------------------------------------------- 
 void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int top_n, 
-	unsigned int top_m, float mu, float mu2, unsigned int min_support) 
+	unsigned int top_m, float mu, float mu2, float beta, unsigned int min_support, string method) 
 {
     // Load vocab
     unordered_map<string, unsigned int> vocab;
@@ -479,20 +482,13 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 
     while (getline(cin, line)) {
 	istringstream iss(line);
+
+	// NOTE: Now, the first token has to be the topic number
 	iss >> topicno;
 	++topic_id;
 
 	// Make sure we had a good topic number
 	vector<unsigned int> query;
-
-	// NOTE: Now, the first token has to be the topic number
-	//--------------------------------------------------
-	// if (boost::ends_with(topicno, ":topic")) strip_after_first(topicno, ':');
-	// else {
-	//     query.push_back(lookup(vocab, 0)(topicno)); // Otherwise, throw it back into the query
-	//     topicno = str(boost::format("%03d") % topic_id);
-	// }
-	//-------------------------------------------------- 
 
 	// Read the rest of the query
 	transform(istream_iterator<string>(iss), istream_iterator<string>(), 
@@ -625,8 +621,8 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 		//--------------------------------------------------
 		// Phase 2: rank
 		//-------------------------------------------------- 
-		facet_rank[facet_id] += exp(score[doc_id]) * (1.0 / ff);
-		facet_norm[facet_id] += (1.0 / ff);
+		facet_rank[facet_id] += exp(score[doc_id]) * (1.0 + beta) / (ff + F * beta);
+		facet_norm[facet_id] += (1.0 + beta) / (ff + F * beta);
 
 		//--------------------------------------------------
 		// Phase 3: smoothed
