@@ -188,7 +188,7 @@ int main(int argc, char** argv) {
 	<< $(&min_support, "min-support", "Set minimum support for facets (defaults 1)")
 	<< $(&top_n, "top-document,n", "Retrieve only top N results (with --query)")
 	<< $(&top_m, "top-facet,m", "Retrieve only top M facet results (with --query)")
-	<< $(&model, "model,m", "Specify the model directory")
+	<< $(&model, "model", "Specify the model directory")
 	<< $$$("");
 
     // Create model directory
