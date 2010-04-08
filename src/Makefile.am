@@ -10,6 +10,9 @@ merge_SOURCES = merge.cpp magicbox.h
 lda_SOURCES = lda.cpp magicbox.h
 slda_SOURCES = slda.cpp magicbox.h
 
+bin_PROGRAMS += prep
+prep_SOURCES = prep.cpp magicbox.h
+
 AM_LDFLAGS = -lboost_program_options-mt -lboost_filesystem-mt -lexpat
 AM_CXXFLAGS = -Wall
 
