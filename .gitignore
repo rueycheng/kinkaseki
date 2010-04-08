@@ -8,5 +8,6 @@ sim
 merge
 lda
 slda
+prep
 Makefile
 config.h
