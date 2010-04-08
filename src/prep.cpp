@@ -14,7 +14,9 @@ int main(int argc, char** argv) {
     vector<string> input;
 
     Getopt g(argc, argv);
-    g   << $(&input, "input", "", -1)
+    g   << $("df", "Collect document-frequency")
+	<< $("tf", "Collect term-frequency")
+	<< $(&input, "input", "", -1)
 	<< $$$("files..");
 
     // Main program
