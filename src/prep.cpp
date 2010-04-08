@@ -11,7 +11,7 @@ using namespace magicbox;
 int main(int argc, char** argv) {
 
     // Getopt
-    unsigned int max_entry = 16 * 1024;
+    unsigned int max_entry = 1024 * 1024;
     vector<string> input;
 
     Getopt g(argc, argv);
