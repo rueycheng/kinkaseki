@@ -77,7 +77,7 @@ int main(int argc, char** argv) {
     namespace fs = boost::filesystem;
 
     // Stopword list
-    unordered_map<string, bool> stopword;
+    unordered_set<string> stopword;
 
     {
 	const char* sw[] = {
@@ -94,7 +94,7 @@ int main(int argc, char** argv) {
 	    "with", "would", "yet", "you", "your", 0 };
 
 	const char** w = sw;
-	while (*w != 0) stopword[*w++] = true;
+	while (*w != 0) stopword.insert(*w++);
     }
 
     {
@@ -127,7 +127,7 @@ int main(int argc, char** argv) {
 		    boost::to_lower(line);
 		    CJKVTokenizer tok(line);
 		    foreach (const string& t, tok) { 
-			if (!g["keep-stopword"] && stopword[t]) continue;
+			if (!g["keep-stopword"] && stopword.find(t) != stopword.end()) continue;
 			if (!g["keep-short-word"] && t.size() < 3) continue;
 			if (!g["keep-long-word"] && t.size() > 25) continue;
 
