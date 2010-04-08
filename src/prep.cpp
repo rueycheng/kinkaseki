@@ -11,22 +11,48 @@ using namespace magicbox;
 int main(int argc, char** argv) {
 
     // Getopt
+    unsigned int max_entry = 16 * 1024;
     vector<string> input;
 
     Getopt g(argc, argv);
-    g   << $(&input, "input", "", -1)
-	<< $$$("files..");
+    g   << $(&max_entry, "max-entry,M", "Maximum number of vocabulary stored in memory")
+	<< $(&input, "input", "", -1)
+	<< $$$("[options..]");
 
     // Main program
-    unordered_map<string,unsigned int> df;
+    typedef unordered_map<string,unsigned int> freq_map;
+    freq_map df;
 
     string line, word;
     while (getline(cin, line)) {
 	istringstream in(line);
+
+	if (df.size() > max_entry) {
+	//--------------------------------------------------
+	//     vector<string> keys;
+	//     foreach (freq_map::value_type& p, df) { keys.push_back(p.first); }
+	//     sort(keys.begin(), keys.end());
+	//     foreach (string key, keys) { cout << key << ' ' << df[key] << '\n'; }
+	//-------------------------------------------------- 
+	    cout << "Flush" << '\n';
+
+	    df.clear();
+	}
+	    
 	while (in >> word) ++df[word];
     }
 
-    cout << df.size() << '\n';
+    if (df.size()) {
+	//--------------------------------------------------
+	// vector<string> keys;
+	// foreach (freq_map::value_type& p, df) { keys.push_back(p.first); }
+	// sort(keys.begin(), keys.end());
+	// foreach (string key, keys) { cout << key << ' ' << df[key] << '\n'; }
+	//-------------------------------------------------- 
+	cout << "Flush" << '\n';
+
+	df.clear();
+    }
 
     return 0;
 }
