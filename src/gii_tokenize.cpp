@@ -54,23 +54,18 @@ int main(int argc, char** argv) {
     Getopt g(argc, argv);
     g   << $("bypass", "Do not tokenize or perform lemmatization")
 	<< $("stem", "Explicitly lemmatize all the tokens")
-	<< $("keep-case", "Do not lowercase")
-	<< $("keep-stopword", "Do not remove stopword")
-	<< $("keep-short-word", "Do not remove short words (size < 3)")
-	<< $("keep-long-word", "Do not remove long words (size > 25)")
+	//--------------------------------------------------
+	// << $("keep-case", "Do not lowercase")
+	// << $("keep-stopword", "Do not remove stopword")
+	// << $("keep-short-word", "Do not remove short words (size < 3)")
+	// << $("keep-long-word", "Do not remove long words (size > 25)")
+	//-------------------------------------------------- 
 	<< $(&input, "input", "", -1)
-	<< $$$("files..");
-
-    if (input.empty()) input.push_back("-");
+	<< $$$("");
 
     // Bypass as necessary
     if (g["bypass"]) {
-	foreach (const string& filename, input) {
-	    AutoIn in(filename);
-
-	    cout << in().rdbuf();
-	}
-
+	cout << cin.rdbuf();
 	return 0;
     }
 
@@ -99,47 +94,41 @@ int main(int argc, char** argv) {
 
     {
 	PorterStemmer ps;
+	string line;
 
-	foreach (const string& filename, input) {
-	    AutoIn in(filename);
-	    string line;
+	bool do_stem = g["stem"];
 
-	    while (getline(in(), line)) {
-		size_t wspos = line.find(' ');
-		string id = line.substr(0, wspos);
-		line.erase(0, wspos);
+	while (getline(cin, line)) {
+	    size_t wspos = line.find(' ');
+	    string id = line.substr(0, wspos);
+	    line.erase(0, wspos);
 
-		if (id.empty()) {
-		    cout << "\n";
-		    continue;
-		}
+	    if (id.empty()) {
+		cout << "\n";
+		continue;
+	    }
 
-		cout << id;
-		if (boost::ends_with(id, ":facet")) {
-		    cout << line;
+	    cout << id;
+	    if (boost::ends_with(id, ":facet")) cout << line;
+	    else {
+		boost::to_lower(line);
+		CJKVTokenizer tok(line);
+		foreach (const string& t, tok) { 
+		    if (stopword.find(t) != stopword.end() || t.size() < 3 || t.size() > 25) continue;
 		//--------------------------------------------------
-		//     typedef boost::tokenizer<> DefaultTokenizer;
-		//     DefaultTokenizer tok(line);
-		//     foreach (const string& t, tok) { cout << ' ' << t; }
+		//     if (!g["keep-stopword"] && stopword.find(t) != stopword.end()) continue;
+		//     if (!g["keep-short-word"] && t.size() < 3) continue;
+		//     if (!g["keep-long-word"] && t.size() > 25) continue;
 		//-------------------------------------------------- 
-		}
-		else {
-		    boost::to_lower(line);
-		    CJKVTokenizer tok(line);
-		    foreach (const string& t, tok) { 
-			if (!g["keep-stopword"] && stopword.find(t) != stopword.end()) continue;
-			if (!g["keep-short-word"] && t.size() < 3) continue;
-			if (!g["keep-long-word"] && t.size() > 25) continue;
 
-			if (!g["stem"]) cout << ' ' << t;
-			else {
-			    if ((t[0] & 0x80) == 0x00) cout << ' ' << ps.stem(t);
-			    else cout << ' ' << t;
-			}
+		    if (!do_stem) cout << ' ' << t;
+		    else {
+			if ((t[0] & 0x80) == 0x00) cout << ' ' << ps.stem(t);
+			else cout << ' ' << t;
 		    }
 		}
-		cout << "\n";
 	    }
+	    cout << "\n";
 	}
     }
 
