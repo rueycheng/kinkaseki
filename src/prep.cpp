@@ -9,7 +9,6 @@ using namespace std;
 using namespace magicbox;
 
 int main(int argc, char** argv) {
-
     // Getopt
     unsigned int max_entry = 1024 * 1024;
     vector<string> input;
@@ -20,40 +19,26 @@ int main(int argc, char** argv) {
 	<< $$$("[options..]");
 
     // Main program
-    typedef unordered_map<string,unsigned int> freq_map;
+    typedef unordered_map<string, unsigned int> freq_map;
+    typedef unordered_set<string> term_set;
+
     freq_map df;
+    term_set terms;
 
     string line, word;
+    istringstream line_in;
+
     while (getline(cin, line)) {
-	istringstream in(line);
+	// Now is time to collect unique terms in a text unit
+	terms.clear();
 
-	in >> word; // The first token is never used here
+	line_in.str(line);
+	line_in.clear();
+	line_in >> word; // Get rid of the first token, i.e., ID
+	while (line_in >> word) terms.insert(word);
 
-	if (df.size() > max_entry) {
-	//--------------------------------------------------
-	//     vector<string> keys;
-	//     foreach (freq_map::value_type& p, df) { keys.push_back(p.first); }
-	//     sort(keys.begin(), keys.end());
-	//     foreach (string key, keys) { cout << key << ' ' << df[key] << '\n'; }
-	//-------------------------------------------------- 
-	    cout << "Flush" << '\n';
-
-	    df.clear();
-	}
-	    
-	while (in >> word) ++df[word];
-    }
-
-    if (df.size()) {
-	//--------------------------------------------------
-	// vector<string> keys;
-	// foreach (freq_map::value_type& p, df) { keys.push_back(p.first); }
-	// sort(keys.begin(), keys.end());
-	// foreach (string key, keys) { cout << key << ' ' << df[key] << '\n'; }
-	//-------------------------------------------------- 
-	cout << "Flush" << '\n';
-
-	df.clear();
+	// Put those counts back in
+	foreach (const string& term, terms) { ++df[term]; }
     }
 
     return 0;
