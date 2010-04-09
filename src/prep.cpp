@@ -27,6 +27,8 @@ int main(int argc, char** argv) {
     while (getline(cin, line)) {
 	istringstream in(line);
 
+	in >> word; // The first token is never used here
+
 	if (df.size() > max_entry) {
 	//--------------------------------------------------
 	//     vector<string> keys;
