@@ -54,6 +54,7 @@ int main(int argc, char** argv) {
     Getopt g(argc, argv);
     g   << $("bypass", "Do not tokenize or perform lemmatization")
 	<< $("stem", "Explicitly lemmatize all the tokens")
+	<< $("utf8", "Use cjkv_separator instead")
 	//--------------------------------------------------
 	// << $("keep-case", "Do not lowercase")
 	// << $("keep-stopword", "Do not remove stopword")
@@ -101,7 +102,9 @@ int main(int argc, char** argv) {
 	while (getline(cin, line)) {
 	    size_t wspos = line.find(' ');
 	    string id = line.substr(0, wspos);
-	    line.erase(0, wspos);
+	//--------------------------------------------------
+	//     line.erase(0, wspos);
+	//-------------------------------------------------- 
 
 	    if (id.empty()) {
 		cout << "\n";
@@ -110,17 +113,24 @@ int main(int argc, char** argv) {
 
 	    cout << id;
 	    if (boost::ends_with(id, ":facet")) cout << line;
-	    else {
+	    else if (g["utf8"]) {
 		boost::to_lower(line);
 		CJKVTokenizer tok(line);
 		foreach (const string& t, tok) { 
+ 		    if (stopword.find(t) != stopword.end() || t.size() < 3 || t.size() > 25) continue;
+		    if (!do_stem) cout << ' ' << t;
+		    else {
+			if ((t[0] & 0x80) == 0x00) cout << ' ' << ps.stem(t);
+			else cout << ' ' << t;
+		    }
+		}
+	    }
+	    else {
+		boost::to_lower(line);
+		boost::char_separator<char> sep;
+		boost::tokenizer<boost::char_separator<char> > tok(line, sep);
+		foreach (const string& t, tok) { 
 		    if (stopword.find(t) != stopword.end() || t.size() < 3 || t.size() > 25) continue;
-		//--------------------------------------------------
-		//     if (!g["keep-stopword"] && stopword.find(t) != stopword.end()) continue;
-		//     if (!g["keep-short-word"] && t.size() < 3) continue;
-		//     if (!g["keep-long-word"] && t.size() > 25) continue;
-		//-------------------------------------------------- 
-
 		    if (!do_stem) cout << ' ' << t;
 		    else {
 			if ((t[0] & 0x80) == 0x00) cout << ' ' << ps.stem(t);
