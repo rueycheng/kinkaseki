@@ -24,9 +24,10 @@ int main(int argc, char** argv) {
     freq_map df;
 
     string line, word;
+    istringstream in;
     while (getline(cin, line)) {
-	istringstream in(line);
-
+	in.str(line);
+	in.clear();
 	in >> word; // The first token is never used here
 
 	if (df.size() > max_entry) {
