@@ -1,1 +1,1 @@
-dist_bin_SCRIPTS = ok pretty-cluster renew-facet
+dist_bin_SCRIPTS = ok prettyprint-cluster renew-facet
