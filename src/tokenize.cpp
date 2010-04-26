@@ -95,10 +95,10 @@ int main(int argc, char** argv) {
 		CJKVTokenizer tok(line);
 		foreach (const string& t, tok) { 
  		    if (stopword.find(t) != stopword.end() || t.size() < 3 || t.size() > 25) continue;
-		    if (!do_stem) cout << ' ' << t;
+		    if (!do_stem) cout << t << ' ';
 		    else {
-			if ((t[0] & 0x80) == 0x00) cout << ' ' << ps.stem(t);
-			else cout << ' ' << t;
+			if ((t[0] & 0x80) == 0x00) cout << ps.stem(t) << ' ';
+			else cout << t << ' ';
 		    }
 		}
 	    }
@@ -108,10 +108,10 @@ int main(int argc, char** argv) {
 		boost::tokenizer<boost::char_separator<char> > tok(line, sep);
 		foreach (const string& t, tok) { 
 		    if (stopword.find(t) != stopword.end() || t.size() < 3 || t.size() > 25) continue;
-		    if (!do_stem) cout << ' ' << t;
+		    if (!do_stem) cout << t << ' ';
 		    else {
-			if ((t[0] & 0x80) == 0x00) cout << ' ' << ps.stem(t);
-			else cout << ' ' << t;
+			if ((t[0] & 0x80) == 0x00) cout << ps.stem(t) << ' ';
+			else cout << t << ' ';
 		    }
 		}
 	    }
