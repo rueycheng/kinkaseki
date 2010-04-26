@@ -1,13 +1,2 @@
-gii_parse
-gii_tokenize
-gii_index
-gii_model1
-gii_model2
-gii_model3
-sim
-merge
-lda
-slda
-prep
 Makefile
 config.h

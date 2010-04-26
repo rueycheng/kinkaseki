@@ -29,5 +29,6 @@ AM_CONDITIONAL([USE_CXX0X], [test $ac_cv_cxx_unordered_map = yes])
 # Checks for library functions.
 
 AC_CONFIG_FILES([Makefile
-                 src/Makefile])
+                 src/Makefile
+		 script/Makefile])
 AC_OUTPUT
