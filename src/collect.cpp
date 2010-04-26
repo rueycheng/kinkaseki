@@ -15,12 +15,13 @@ using namespace magicbox;
 
 int main(int argc, char** argv) {
     // Getopt
+    bool drop_first_token = false;
     unsigned int max_entry = 1024 * 1024;
-    vector<string> input;
 
     Getopt g(argc, argv);
     g   << $(&max_entry, "max-entry,M", "Maximum number of vocabulary stored in memory")
-	<< $(&input, "input", "", -1)
+	<< $(&drop_first_token, "drop-first-token", 
+		"Drop the first token in each line.  Useful when the first token is used as docno.")
 	<< $$$("[options..]");
 
     //--------------------------------------------------
@@ -46,8 +47,8 @@ int main(int argc, char** argv) {
 	line_in.str(line);
 	line_in.clear();
 
-	// Get rid of the first token, i.e., ID
-	line_in >> word; 
+	// Get rid of the first token as necessary
+	if (drop_first_token) line_in >> word; 
 
 	// Now is time to collect unique terms in a text unit
 	terms.clear();
@@ -58,7 +59,7 @@ int main(int argc, char** argv) {
 
 	// Flush as necesary
 	if (df.size() > max_entry) {
-	    string runfile = boost::str(boost::format("prep-%d.run.%05d") % pid % ++runno);
+	    string runfile = boost::str(boost::format("collect-%d.run.%05d") % pid % ++runno);
 	    fs::ofstream runout(runfile);
 
 	    vector<string> terms;
@@ -71,7 +72,7 @@ int main(int argc, char** argv) {
 
     // Flush as necesary (shameless copy)
     if (!df.empty()) {
-	string runfile = boost::str(boost::format("prep-%d.run.%05d") % pid % ++runno);
+	string runfile = boost::str(boost::format("collect-%d.run.%05d") % pid % ++runno);
 	fs::ofstream runout(runfile);
 
 	vector<string> terms;

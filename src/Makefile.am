@@ -1,5 +1,6 @@
-bin_PROGRAMS = tokenize
+bin_PROGRAMS = tokenize collect
 tokenize_SOURCES = tokenize.cpp compat.h magicbox.h porter.c porter.h
+collect_SOURCES = collect.cpp compat.h magicbox.h
 #--------------------------------------------------
 # bin_PROGRAMS = gii_parse gii_tokenize gii_index gii_model1 gii_model2 gii_model3 sim merge lda slda
 # gii_parse_SOURCES = gii_parse.cpp magicbox.h expatpp.h expatpp_callback.h gii_parse.h
