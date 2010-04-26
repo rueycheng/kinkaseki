@@ -135,7 +135,7 @@ sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-dist_bin_SCRIPTS = ok
+dist_bin_SCRIPTS = ok pretty-cluster renew-facet
 all: all-am
 
 .SUFFIXES:
