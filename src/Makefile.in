@@ -30,7 +30,8 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-bin_PROGRAMS = tokenize$(EXEEXT) collect$(EXEEXT) compile$(EXEEXT)
+bin_PROGRAMS = tokenize$(EXEEXT) collect$(EXEEXT) compile$(EXEEXT) \
+	kmeans$(EXEEXT)
 @USE_CXX0X_TRUE@am__append_1 = -std=c++0x
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in compile
@@ -51,6 +52,9 @@ collect_LDADD = $(LDADD)
 am_compile_OBJECTS = compile.$(OBJEXT)
 compile_OBJECTS = $(am_compile_OBJECTS)
 compile_LDADD = $(LDADD)
+am_kmeans_OBJECTS = kmeans.$(OBJEXT)
+kmeans_OBJECTS = $(am_kmeans_OBJECTS)
+kmeans_LDADD = $(LDADD)
 am_tokenize_OBJECTS = tokenize.$(OBJEXT) porter.$(OBJEXT)
 tokenize_OBJECTS = $(am_tokenize_OBJECTS)
 tokenize_LDADD = $(LDADD)
@@ -66,8 +70,9 @@ CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 CXXLD = $(CXX)
 CXXLINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
 	-o $@
-SOURCES = $(collect_SOURCES) $(compile_SOURCES) $(tokenize_SOURCES)
-DIST_SOURCES = $(collect_SOURCES) $(compile_SOURCES) \
+SOURCES = $(collect_SOURCES) $(compile_SOURCES) $(kmeans_SOURCES) \
+	$(tokenize_SOURCES)
+DIST_SOURCES = $(collect_SOURCES) $(compile_SOURCES) $(kmeans_SOURCES) \
 	$(tokenize_SOURCES)
 ETAGS = etags
 CTAGS = ctags
@@ -163,6 +168,7 @@ top_srcdir = @top_srcdir@
 tokenize_SOURCES = tokenize.cpp compat.h magicbox.h porter.c porter.h
 collect_SOURCES = collect.cpp compat.h magicbox.h
 compile_SOURCES = compile.cpp compat.h magicbox.h
+kmeans_SOURCES = kmeans.cpp compat.h magicbox.h
 #--------------------------------------------------
 # bin_PROGRAMS = gii_parse gii_tokenize gii_index gii_model1 gii_model2 gii_model3 sim merge lda slda
 # gii_parse_SOURCES = gii_parse.cpp magicbox.h expatpp.h expatpp_callback.h gii_parse.h
@@ -246,6 +252,9 @@ collect$(EXEEXT): $(collect_OBJECTS) $(collect_DEPENDENCIES)
 compile$(EXEEXT): $(compile_OBJECTS) $(compile_DEPENDENCIES) 
 	@rm -f compile$(EXEEXT)
 	$(CXXLINK) $(compile_OBJECTS) $(compile_LDADD) $(LIBS)
+kmeans$(EXEEXT): $(kmeans_OBJECTS) $(kmeans_DEPENDENCIES) 
+	@rm -f kmeans$(EXEEXT)
+	$(CXXLINK) $(kmeans_OBJECTS) $(kmeans_LDADD) $(LIBS)
 tokenize$(EXEEXT): $(tokenize_OBJECTS) $(tokenize_DEPENDENCIES) 
 	@rm -f tokenize$(EXEEXT)
 	$(CXXLINK) $(tokenize_OBJECTS) $(tokenize_LDADD) $(LIBS)
@@ -258,6 +267,7 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/collect.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/compile.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/kmeans.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/porter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tokenize.Po@am__quote@
 
