@@ -1,6 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <numeric>
+#include <limits>
 
 #include "magicbox.h"
 #include "common.h"
@@ -37,7 +39,7 @@ float cosine_distance_prenormalized(const feature_vector& lhs, const feature_vec
 	else sum += (first1++)->second * (first2++)->second;
     }
 
-    return sum;
+    return 1.0 - sum;
 }
 
 float l1_distance(const feature_vector& lhs, const feature_vector& rhs) {
@@ -100,20 +102,33 @@ int main(int argc, char** argv) {
     // Getopt
     unsigned int num_cluster = 0;
     string distance = "cosine";
+    float epsilon = 0.0001;
 
     Getopt g(argc, argv);
-    g   << $(&num_cluster, "num-cluster,k", "The number of clusters (K)")
+    g   << $(&num_cluster, "num-cluster,k", "The number of clusters (K).")
 	<< $(&distance, "distance", 
 		"The distance function: cosine , l1, or l2.  Defaults 'cosine'.")
+	<< $(&epsilon, "epsilon,e", "The lowest tolerable error.  Defaults '0.0001'.")
+	<< $("use-kmedoids", 
+		"Employ k-medoids algorithm.\n" 
+		"In other words, new centroids are chosen as the instance closest to the cluster center."
+		)
 	<< $$$("[options..]");
 
     // Go!
-    float (*distance_function)(const feature_vector&, const feature_vector&);
+    if (num_cluster <= 0) die("The number of cluster (--num-cluster,-k) should be greater than 0");
 
+    // Set up the normalizer and distance function
+    float (*distance_function)(const feature_vector&, const feature_vector&);
+    bool normalized_by_l2 = false;
+
+    // NOTE: I assume the features weights were prenormalized when using cosine
     if (distance == "l1") distance_function = l1_distance;
     else if (distance == "l2") distance_function = l2_distance;
-    else distance_function = cosine_distance_prenormalized; 
-    // NOTE: I assume the features weights were prenormalized when using cosine
+    else {
+	distance_function = cosine_distance_prenormalized; 
+	normalized_by_l2 = true;
+    }
     
     vector<feature_vector> instances;
     vector<unsigned int> labels;
@@ -125,22 +140,26 @@ int main(int argc, char** argv) {
     string line;
     istringstream line_in;
 
+    cerr << "kmeans: Process the input" << '\n';
+
+    unsigned int key;
+    float value;
+    char sep;
+    feature_vector fv;
+
     while (getline(cin, line)) {
 	line_in.str(line);
 	line_in.clear();
 
-	instances.push_back(feature_vector());
-	labels.push_back(0);
-
-	feature_vector& fv = instances.back();
-
-	unsigned int key;
-	float value;
-	char sep;
-
+	fv.data.clear();
 	while (line_in >> key >> sep >> value) {
 	    if (key > num_feature) num_feature = key;
 	    fv.data.push_back(make_pair(key, value));
+	}
+
+	if (!fv.data.empty()) {
+	    instances.push_back(fv);
+	    labels.push_back(0);
 	}
     }
 
@@ -152,7 +171,19 @@ int main(int argc, char** argv) {
     random_sample_n(instances.begin(), instances.end(),
 	    back_inserter(centroids), num_cluster);
 
+    cerr << "kmeans: Select arbitrary centroids" << '\n';
+
     unsigned int num_instance = instances.size();
+
+    // Start with maximized error
+    float sum_of_errors_prev = std::numeric_limits<float>::max();
+
+    //--------------------------------------------------
+    // Step 3: Enter the main loop
+    //-------------------------------------------------- 
+    cerr << "kmeans: num_cluster=" << num_cluster << '\n';
+    cerr << "kmeans: num_instance=" << num_instance << '\n';
+    cerr << "kmeans: num_feature=" << num_feature << '\n';
 
     for (unsigned int i = 1; ; ++i) {
 	float sum_of_errors = 0.0;
@@ -163,7 +194,7 @@ int main(int argc, char** argv) {
 	for (unsigned int j = 0; j < num_instance; ++j) {
 	    const feature_vector& inst = instances[j];
 
-	    float min_dist = 1.0; // The maximum in the first octant
+	    float min_dist = std::numeric_limits<float>::max(); // The maximum in the first octant
 	    unsigned int min_label = 0;
 
 	    for (unsigned int kk = 0; kk < num_cluster; ++kk) {
@@ -183,14 +214,19 @@ int main(int argc, char** argv) {
 	    assignments[min_label].push_back(j);
 	}
 
-	cerr << "Estimation #" << i << " err=" << sum_of_errors << "\n";
+	cerr << "kmeans: Estimation #" << i << " err=" << sum_of_errors << "\n";
+
+	//--------------------------------------------------
+	// for (unsigned int k = 0; k < num_cluster; ++k) 
+	//     cerr << "kmeans: Cluster #" << i << " size=" << assignments[k].size() << '\n';
+	//-------------------------------------------------- 
 
 	// Recalculate the centroids based on the content of bins
 	for (unsigned int k = 0; k < num_cluster; ++k) {
 	    const vector<unsigned int>& bin = assignments[k];
 
 	    // HACK: Employ dense representation for fast computation
-	    vector<float> rep(num_feature, 0.0); 
+	    vector<float> rep(num_feature + 1, 0.0); // NOTE: Feature ID begins at 1
 	    feature_vector new_centroid;
 
 	    foreach (const unsigned int j, bin) {
@@ -201,16 +237,53 @@ int main(int argc, char** argv) {
 	    }
 
 	    // Produce the sparse representation
+	    unsigned int bin_size = bin.size();
 	    for (unsigned int t = 0; t < num_feature; ++t) {
 		if (rep[t] == 0.0) continue;
-		new_centroid.data.push_back(make_pair(t, rep[t]));
+		new_centroid.data.push_back(make_pair(t, rep[t] / bin_size));
+	    }
+
+	    if (normalized_by_l2) {
+		float sum_of_square = 0.0;
+		foreach (const feature_vector::component_type& comp, new_centroid.data) {
+		    sum_of_square += comp.second * comp.second;
+		}
+
+		sum_of_square = std::sqrt(sum_of_square);
+		foreach (feature_vector::component_type& comp, new_centroid.data) {
+		    comp.second /= sum_of_square;
+		}
+	    }
+
+	    if (g["use-kmedoids"]) {
+		unsigned int nearest_dist = std::numeric_limits<float>::max();
+		unsigned int nearest_instance = bin[0];  // Dirty!
+
+		foreach (const unsigned int j, bin) {
+		    float dist = distance_function(instances[j], new_centroid);
+		    if (dist < nearest_dist) {
+			nearest_dist = dist;
+			nearest_instance = j;
+		    }
+		}
+
+		// Now use the nearest instance instead
+		new_centroid = instances[nearest_instance];
 	    }
 
 	    // Write back
 	    centroids[k] = new_centroid;
 	}
 
-	cerr << "Maximization #" << i << "\n";
+	cerr << "kmeans: Maximization #" << i << "\n";
+
+	if ((sum_of_errors_prev - sum_of_errors >= 0)
+		&& (sum_of_errors_prev - sum_of_errors < epsilon)) break; // Congrats!
+	sum_of_errors_prev = sum_of_errors;
+    }
+
+    foreach (const unsigned int l, labels) {
+	cout << l << '\n';
     }
 
     return 0;
