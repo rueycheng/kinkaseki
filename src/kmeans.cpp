@@ -108,6 +108,13 @@ int main(int argc, char** argv) {
 	<< $$$("[options..]");
 
     // Go!
+    float (*distance_function)(const feature_vector&, const feature_vector&);
+
+    if (distance == "l1") distance_function = l1_distance;
+    else if (distance == "l2") distance_function = l2_distance;
+    else distance_function = cosine_distance_prenormalized; 
+    // NOTE: I assume the features weights were prenormalized when using cosine
+    
     vector<feature_vector> instances;
     vector<unsigned int> labels;
     unsigned int num_feature = 0;
@@ -145,16 +152,13 @@ int main(int argc, char** argv) {
     random_sample_n(instances.begin(), instances.end(),
 	    back_inserter(centroids), num_cluster);
 
-    float (*distance_function)(const feature_vector&, const feature_vector&);
-    if (distance == "l1") distance_function = l1_distance;
-    else if (distance == "l2") distance_function = l2_distance;
-    else distance_function = cosine_distance_prenormalized; 
-    // NOTE: I assume the features weights were prenormalized when using cosine
-    
     unsigned int num_instance = instances.size();
 
     for (unsigned int i = 1; ; ++i) {
 	float sum_of_errors = 0.0;
+
+	// Start with empty bins
+	vector<vector<unsigned int> > assignments(num_cluster, vector<unsigned int>());
 
 	for (unsigned int j = 0; j < num_instance; ++j) {
 	    const feature_vector& inst = instances[j];
@@ -174,9 +178,39 @@ int main(int argc, char** argv) {
 
 	    sum_of_errors += min_dist;
 	    labels[j] = min_label;
+
+	    // Push the instance ID into the right bin (important!)
+	    assignments[min_label].push_back(j);
 	}
 
-	cerr << "Iteration #" << i << " err=" << sum_of_errors << "\n";
+	cerr << "Estimation #" << i << " err=" << sum_of_errors << "\n";
+
+	// Recalculate the centroids based on the content of bins
+	for (unsigned int k = 0; k < num_cluster; ++k) {
+	    const vector<unsigned int>& bin = assignments[k];
+
+	    // HACK: Employ dense representation for fast computation
+	    vector<float> rep(num_feature, 0.0); 
+	    feature_vector new_centroid;
+
+	    foreach (const unsigned int j, bin) {
+		const feature_vector& inst = instances[j];
+		foreach (const feature_vector::component_type& comp, inst.data) {
+		    rep[comp.first] += comp.second;
+		}
+	    }
+
+	    // Produce the sparse representation
+	    for (unsigned int t = 0; t < num_feature; ++t) {
+		if (rep[t] == 0.0) continue;
+		new_centroid.data.push_back(make_pair(t, rep[t]));
+	    }
+
+	    // Write back
+	    centroids[k] = new_centroid;
+	}
+
+	cerr << "Maximization #" << i << "\n";
     }
 
     return 0;
