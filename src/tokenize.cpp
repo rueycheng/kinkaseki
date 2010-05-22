@@ -90,8 +90,9 @@ int main(int argc, char** argv) {
 	bool do_utf8 = g["utf8"];
 
 	while (getline(cin, line)) {
+	    boost::to_lower(line);
+
 	    if (do_utf8) {
-		boost::to_lower(line);
 		CJKVTokenizer tok(line);
 		foreach (const string& t, tok) { 
  		    if (stopword.find(t) != stopword.end() || t.size() < 3 || t.size() > 25) continue;
@@ -103,7 +104,6 @@ int main(int argc, char** argv) {
 		}
 	    }
 	    else {
-		boost::to_lower(line);
 		boost::char_separator<char> sep;
 		boost::tokenizer<boost::char_separator<char> > tok(line, sep);
 		foreach (const string& t, tok) { 
