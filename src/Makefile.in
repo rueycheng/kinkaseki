@@ -31,7 +31,7 @@ NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
 bin_PROGRAMS = tokenize$(EXEEXT) collect$(EXEEXT) compile$(EXEEXT) \
-	kmeans$(EXEEXT)
+	kmeans$(EXEEXT) blm$(EXEEXT)
 @USE_CXX0X_TRUE@am__append_1 = -std=c++0x
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in compile
@@ -46,6 +46,9 @@ CONFIG_CLEAN_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS)
+am_blm_OBJECTS = blm.$(OBJEXT)
+blm_OBJECTS = $(am_blm_OBJECTS)
+blm_LDADD = $(LDADD)
 am_collect_OBJECTS = collect.$(OBJEXT)
 collect_OBJECTS = $(am_collect_OBJECTS)
 collect_LDADD = $(LDADD)
@@ -70,10 +73,10 @@ CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 CXXLD = $(CXX)
 CXXLINK = $(CXXLD) $(AM_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
 	-o $@
-SOURCES = $(collect_SOURCES) $(compile_SOURCES) $(kmeans_SOURCES) \
-	$(tokenize_SOURCES)
-DIST_SOURCES = $(collect_SOURCES) $(compile_SOURCES) $(kmeans_SOURCES) \
-	$(tokenize_SOURCES)
+SOURCES = $(blm_SOURCES) $(collect_SOURCES) $(compile_SOURCES) \
+	$(kmeans_SOURCES) $(tokenize_SOURCES)
+DIST_SOURCES = $(blm_SOURCES) $(collect_SOURCES) $(compile_SOURCES) \
+	$(kmeans_SOURCES) $(tokenize_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -169,6 +172,7 @@ tokenize_SOURCES = tokenize.cpp compat.h magicbox.h porter.c porter.h
 collect_SOURCES = collect.cpp compat.h magicbox.h
 compile_SOURCES = compile.cpp compat.h magicbox.h
 kmeans_SOURCES = kmeans.cpp compat.h magicbox.h
+blm_SOURCES = blm.cpp compat.h magicbox.h
 #--------------------------------------------------
 # bin_PROGRAMS = gii_parse gii_tokenize gii_index gii_model1 gii_model2 gii_model3 sim merge lda slda
 # gii_parse_SOURCES = gii_parse.cpp magicbox.h expatpp.h expatpp_callback.h gii_parse.h
@@ -246,6 +250,9 @@ uninstall-binPROGRAMS:
 
 clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
+blm$(EXEEXT): $(blm_OBJECTS) $(blm_DEPENDENCIES) 
+	@rm -f blm$(EXEEXT)
+	$(CXXLINK) $(blm_OBJECTS) $(blm_LDADD) $(LIBS)
 collect$(EXEEXT): $(collect_OBJECTS) $(collect_DEPENDENCIES) 
 	@rm -f collect$(EXEEXT)
 	$(CXXLINK) $(collect_OBJECTS) $(collect_LDADD) $(LIBS)
@@ -265,6 +272,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/blm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/collect.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/compile.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/kmeans.Po@am__quote@
