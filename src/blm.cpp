@@ -189,7 +189,7 @@ int main(int argc, char** argv) {
 	<< $(&top_n, "top-document,n", "Retrieve only top N results (with --query)")
 	<< $(&top_m, "top-facet,m", "Retrieve only top M facet results (with --query)")
 	<< $(&model, "model", "Specify the model directory")
-	<< $$$("");
+	<< $$$("blm [option..]");
 
     // Create model directory
     if (!g["query"] && !g["force"] && fs::exists(model)) die("Use --force to override existing model");
