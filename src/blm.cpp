@@ -161,7 +161,7 @@ namespace std {
 namespace fs = boost::filesystem;
 
 void create_model(fs::path&);
-void query_model(fs::path&, bool, bool, unsigned int, unsigned int, float, float, float, unsigned int, string, bool);
+void query_model(fs::path&, bool, bool, unsigned int, unsigned int, float, float, float, unsigned int, string, bool, bool);
 
 //--------------------------------------------------
 // Main program
@@ -179,6 +179,7 @@ int main(int argc, char** argv) {
 	<< $("no-result", "Do not return results (with --query)")
 	<< $("no-facet", "Do not return facets (with --query)")
 	<< $("normalize", "Prior-based normalization")
+	<< $("weighted", "Use weighted query-likelihood instead")
 	<< $("silent", "Turn off error reporting")
 	<< $("force", "Force override existing model")
 	<< $(&method, "method", "Specify facet ranking method: count, simple, dirichlet")
@@ -201,7 +202,7 @@ int main(int argc, char** argv) {
 
     if (!g["query"]) create_model(basedir);
     else query_model(basedir, g["no-result"], g["no-facet"], top_n, top_m, mu, mu2, beta, min_support, 
-	    method, g["normalize"]);
+	    method, g["normalize"], g["weighted"]);
 
     return 0;
 }
@@ -363,7 +364,8 @@ void create_model(fs::path& basedir) {
 // Case 2:  Query the model
 //-------------------------------------------------- 
 void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int top_n, 
-	unsigned int top_m, float mu, float mu2, float beta, unsigned int min_support, string method, bool normalize) 
+	unsigned int top_m, float mu, float mu2, float beta, unsigned int min_support, 
+	string method, bool normalize, bool weighted) 
 {
     // Load vocab
     unordered_map<string, unsigned int> vocab;
@@ -491,10 +493,34 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 
 	// Make sure we had a good topic number
 	vector<unsigned int> query;
+	vector<float> query_weight;
 
 	// Read the rest of the query
 	transform(istream_iterator<string>(iss), istream_iterator<string>(), 
 		back_inserter(query), lookup(vocab, 0));
+
+	if (weighted) {
+	    string next_line;
+
+	    // Die when weights are missing from the context
+	    if (!getline(cin, next_line)) throw 0; 
+
+	    istringstream iss2(next_line);
+	    copy(istream_iterator<float>(iss), istream_iterator<float>(),
+		    back_inserter(query_weight));
+
+	    // Die when the numbers do not match
+	    if (query_weight.size() != query.size()) throw 0;
+
+	    float query_weight_sum = accumulate(query_weight.begin(), query_weight.end(), 0.0) / query.size();
+
+	    // Die when the sum equals zero
+	    if (query_weight_sum == 0.0) throw 0;
+	    transform(query_weight.begin(), query_weight.end(), query_weight.begin(),
+		    bind2nd(divides<float>(), 0));
+	}
+	else 
+	    fill_n(back_inserter(query_weight), query.size(), 1.0);
 
 	//--------------------------------------------------
 	// Step 1: Documents
@@ -513,13 +539,29 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	// NOTE: (1) is done in posting-list traversal,
 	//       (2) is a globally-determined constant in the session,
 	//       and (3) is a document-dependent normalizing factor.
+	// 
+	// WEIGHTED VARIATION:
+	// \log \Pr(Q|d) = \sum_{q \in Q \cap d} w_q \log(1 + f_{q,d} |C| / \mu f_q)    ...(1)
+	//               + |Q| \log \mu - |Q| \log |C| + \sum_{q \in Q} w_q \log f_q    ...(2)
+	//               - |Q| \log(|d| + \mu)                                      ...(3)
+	//
+	//
+	// NOTE: Now (2) is obsoleted.
 	//--------------------------------------------------
 	
-	// Placeholder for the result of (2)
-	float sum_of_logtf = 0.0;
+	//--------------------------------------------------
+	// // Placeholder for the result of (2)
+	// float sum_of_logtf = 0.0;
+	//-------------------------------------------------- 
 
 	// Iterate through each term
-	foreach (unsigned int term_id, query) {
+	vector<unsigned int>::const_iterator qiter = query.begin();
+	vector<float>::const_iterator qwiter = query_weight.begin();
+
+	while (qiter != query.end()) {
+	    unsigned int term_id = *qiter++;
+	    float term_weight = *qwiter++;
+
 	    if (term_id == 0) continue;
 
 	    // Make a jump
@@ -528,15 +570,17 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	    unsigned int df, tf;
 	    t2d_in >> unpack(df) >> unpack(tf);
 
-	    // Accumulate counts for computation of (2)
-	    sum_of_logtf += log(tf);
+	//--------------------------------------------------
+	//     // Accumulate counts for computation of (2)
+	//     sum_of_logtf += term_weight * log(tf);
+	//-------------------------------------------------- 
 
 	    for (unsigned int i = 0; i < df; ++i) {
 		unsigned int doc_id, count;
 		t2d_in >> unpack(doc_id) >> unpack(count);
 
 		// Compute (1)
-		score[doc_id] += log(1 + float(count * L) / (mu * tf));
+		score[doc_id] += term_weight * log(1 + float(count * L) / (mu * tf));
 	    }
 	}
 
