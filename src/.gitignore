@@ -3,3 +3,5 @@ compile
 kmeans
 tokenize
 blm
+*.o
+.deps
