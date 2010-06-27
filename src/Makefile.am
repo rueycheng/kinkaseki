@@ -23,7 +23,7 @@ blm_SOURCES = blm.cpp compat.h magicbox.h
 # prep_SOURCES = prep.cpp magicbox.h
 #-------------------------------------------------- 
 
-AM_LDFLAGS = -lboost_program_options-mt -lboost_filesystem-mt -lexpat
+AM_LDFLAGS = -lboost_program_options-mt -lboost_filesystem-mt
 AM_CXXFLAGS = -Wall
 
 if USE_CXX0X

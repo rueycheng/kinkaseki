@@ -191,7 +191,7 @@ blm_SOURCES = blm.cpp compat.h magicbox.h
 # bin_PROGRAMS += prep
 # prep_SOURCES = prep.cpp magicbox.h
 #-------------------------------------------------- 
-AM_LDFLAGS = -lboost_program_options-mt -lboost_filesystem-mt -lexpat
+AM_LDFLAGS = -lboost_program_options-mt -lboost_filesystem-mt
 AM_CXXFLAGS = -Wall $(am__append_1)
 INCLUDES = -I@topdir@
 all: all-am

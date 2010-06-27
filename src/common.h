@@ -1,8 +1,10 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include "expatpp.h"
-#include "expatpp_callback.h"
+//--------------------------------------------------
+// #include "expatpp.h"
+// #include "expatpp_callback.h"
+//-------------------------------------------------- 
 
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
@@ -115,87 +117,89 @@ public:
 typedef boost::tokenizer<CJKVSeparator> CJKVTokenizer;
 
 //--------------------------------------------------
-// TagContext
+// //--------------------------------------------------
+// // TagContext
+// //-------------------------------------------------- 
+// class TagContext {
+//     std::string context;
+//     std::vector<int> offset;
+// 
+// public:
+//     TagContext() {}
+//     TagContext(const char* path) {
+// 	context.assign(path);
+// 	if (path[0] != '/') throw;
+// 	for (int i = 0; path[i]; i++) 
+// 	    if (path[i] == '/') offset.push_back(i + 1);
+//     }
+// 
+//     bool operator==(const TagContext& t) { return context == t.context; }
+//     bool operator!=(const TagContext& t) { return context != t.context; }
+//     bool operator==(const char* path) { return context == path; }
+//     bool operator!=(const char* path) { return context != path; }
+// 
+//     void enter(const char* comp) {
+// 	offset.push_back(context.size());
+// 	context = context + '/' + comp; // instead of `+='
+//     }
+// 
+//     void leave() {
+// 	if (offset.size()) {
+// 	    context.erase(context.begin() + offset.back(), context.end());
+// 	    offset.pop_back();
+// 	}
+//     }
+// 
+//     bool empty() const { return context.empty(); }
+//     const char* path() const { return context.c_str(); }
+//     const char* top() const { 
+// 	if (offset.size()) return context.c_str() + offset.back() + 1;
+// 	else return context.c_str();
+//     }
+// };
+// 
+// //--------------------------------------------------
+// // ContextualSAXHandler
+// //-------------------------------------------------- 
+// class ContextualSAXHandler: public expatpp::callback::SAXHandler {
+//     TagContext context;
+// 
+// public:
+//     typedef std::map<std::string, std::string> attribute_map;
+// 
+//     void startElement(const expatpp::Char* name, const expatpp::Char** atts) { 
+// 	if (strcmp(name, "root") == 0 && context.empty()) return;
+// 	context.enter(name);
+// 	enterContext(context.path(), name, make_map(atts));
+//     }
+// 
+//     void endElement(const expatpp::Char* name) {
+// 	if (context.path() == context.top()) return;
+// 	leaveContext(context.path(), name);
+// 	context.leave();
+//     }
+// 
+//     void characterData(const expatpp::Char* s, int len) {
+// 	if (context.empty()) return;
+// 	text(context.path(), std::string(s, len));
+//     }
+// 
+//     virtual void enterContext(std::string context, std::string name, attribute_map attr) {}
+//     virtual void leaveContext(std::string context, std::string name) {}
+//     virtual void text(std::string context, std::string text) {}
+// 
+// private:
+//     inline attribute_map make_map(const expatpp::Char** atts) {
+// 	attribute_map m;
+// 
+// 	while (*atts) {
+// 	    m[*atts] = *(atts + 1);
+// 	    atts += 2;
+// 	}
+// 	return m;
+//     }
+// };
 //-------------------------------------------------- 
-class TagContext {
-    std::string context;
-    std::vector<int> offset;
-
-public:
-    TagContext() {}
-    TagContext(const char* path) {
-	context.assign(path);
-	if (path[0] != '/') throw;
-	for (int i = 0; path[i]; i++) 
-	    if (path[i] == '/') offset.push_back(i + 1);
-    }
-
-    bool operator==(const TagContext& t) { return context == t.context; }
-    bool operator!=(const TagContext& t) { return context != t.context; }
-    bool operator==(const char* path) { return context == path; }
-    bool operator!=(const char* path) { return context != path; }
-
-    void enter(const char* comp) {
-	offset.push_back(context.size());
-	context = context + '/' + comp; // instead of `+='
-    }
-
-    void leave() {
-	if (offset.size()) {
-	    context.erase(context.begin() + offset.back(), context.end());
-	    offset.pop_back();
-	}
-    }
-
-    bool empty() const { return context.empty(); }
-    const char* path() const { return context.c_str(); }
-    const char* top() const { 
-	if (offset.size()) return context.c_str() + offset.back() + 1;
-	else return context.c_str();
-    }
-};
-
-//--------------------------------------------------
-// ContextualSAXHandler
-//-------------------------------------------------- 
-class ContextualSAXHandler: public expatpp::callback::SAXHandler {
-    TagContext context;
-
-public:
-    typedef std::map<std::string, std::string> attribute_map;
-
-    void startElement(const expatpp::Char* name, const expatpp::Char** atts) { 
-	if (strcmp(name, "root") == 0 && context.empty()) return;
-	context.enter(name);
-	enterContext(context.path(), name, make_map(atts));
-    }
-
-    void endElement(const expatpp::Char* name) {
-	if (context.path() == context.top()) return;
-	leaveContext(context.path(), name);
-	context.leave();
-    }
-
-    void characterData(const expatpp::Char* s, int len) {
-	if (context.empty()) return;
-	text(context.path(), std::string(s, len));
-    }
-
-    virtual void enterContext(std::string context, std::string name, attribute_map attr) {}
-    virtual void leaveContext(std::string context, std::string name) {}
-    virtual void text(std::string context, std::string text) {}
-
-private:
-    inline attribute_map make_map(const expatpp::Char** atts) {
-	attribute_map m;
-
-	while (*atts) {
-	    m[*atts] = *(atts + 1);
-	    atts += 2;
-	}
-	return m;
-    }
-};
 
 //--------------------------------------------------
 // Procedures
