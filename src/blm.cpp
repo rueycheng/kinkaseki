@@ -528,11 +528,6 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	else 
 	    fill_n(back_inserter(query_weight), query.size(), 1.0);
 
-	cerr << "query weights: ";
-	copy(query_weight.begin(), query_weight.end(),
-		ostream_iterator<float>(cerr, " "));
-	cerr << "\n";
-
 	//--------------------------------------------------
 	// Step 1: Documents
 	//-------------------------------------------------- 
