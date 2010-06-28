@@ -523,10 +523,15 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	    // Die when the sum equals zero
 	    if (query_weight_sum == 0.0) throw 0;
 	    transform(query_weight.begin(), query_weight.end(), query_weight.begin(),
-		    bind2nd(divides<float>(), 0));
+		    bind2nd(divides<float>(), query_weight_sum));
 	}
 	else 
 	    fill_n(back_inserter(query_weight), query.size(), 1.0);
+
+	cerr << "query weights: ";
+	copy(query_weight.begin(), query_weight.end(),
+		ostream_iterator<float>(cerr, " "));
+	cerr << "\n";
 
 	//--------------------------------------------------
 	// Step 1: Documents
