@@ -503,14 +503,20 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	    string next_line;
 
 	    // Die when weights are missing from the context
-	    if (!getline(cin, next_line)) throw 0; 
+	    if (!getline(cin, next_line)) {
+		cerr << "Missing weight spec" << "\n";
+		return;
+	    }
 
 	    istringstream iss2(next_line);
-	    copy(istream_iterator<float>(iss), istream_iterator<float>(),
+	    copy(istream_iterator<float>(iss2), istream_iterator<float>(),
 		    back_inserter(query_weight));
 
 	    // Die when the numbers do not match
-	    if (query_weight.size() != query.size()) throw 0;
+	    if (query_weight.size() != query.size()) {
+		cerr << "Mismatched weight spec " << query_weight.size() << " " << query.size() << "\n";
+		return;
+	    }
 
 	    float query_weight_sum = accumulate(query_weight.begin(), query_weight.end(), 0.0) / query.size();
 
