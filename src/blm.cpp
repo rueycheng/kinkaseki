@@ -161,7 +161,7 @@ namespace std {
 namespace fs = boost::filesystem;
 
 void create_model(fs::path&);
-void query_model(fs::path&, bool, bool, unsigned int, unsigned int, float, float, float, unsigned int, string, bool, bool);
+void query_model(fs::path&, bool, bool, unsigned int, unsigned int, float, float, float, unsigned int, string, bool, bool, bool);
 
 //--------------------------------------------------
 // Main program
@@ -180,6 +180,7 @@ int main(int argc, char** argv) {
 	<< $("no-facet", "Do not return facets (with --query)")
 	<< $("normalize", "Prior-based normalization")
 	<< $("weighted", "Use weighted query-likelihood instead")
+	<< $("simple-skewness", "Dirty fix for the probability underflow problem")
 	<< $("silent", "Turn off error reporting")
 	<< $("force", "Force override existing model")
 	<< $(&method, "method", "Specify facet ranking method: count, simple, dirichlet")
@@ -202,7 +203,7 @@ int main(int argc, char** argv) {
 
     if (!g["query"]) create_model(basedir);
     else query_model(basedir, g["no-result"], g["no-facet"], top_n, top_m, mu, mu2, beta, min_support, 
-	    method, g["normalize"], g["weighted"]);
+	    method, g["normalize"], g["weighted"], g["simple-skewness"]);
 
     return 0;
 }
@@ -365,7 +366,7 @@ void create_model(fs::path& basedir) {
 //-------------------------------------------------- 
 void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int top_n, 
 	unsigned int top_m, float mu, float mu2, float beta, unsigned int min_support, 
-	string method, bool normalize, bool weighted) 
+	string method, bool normalize, bool weighted, bool simple_skewness) 
 {
     // Load vocab
     unordered_map<string, unsigned int> vocab;
@@ -521,8 +522,12 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	    float query_weight_sum = accumulate(query_weight.begin(), query_weight.end(), 0.0) / query.size();
 
 	    // Die when the sum equals zero
-	    if (query_weight_sum == 0.0) throw 0;
-	    transform(query_weight.begin(), query_weight.end(), query_weight.begin(),
+	    if (query_weight_sum == 0.0) {
+		query_weight.clear();
+		fill_n(back_inserter(query_weight), query.size(), 1.0);
+	    }
+	    else 
+		transform(query_weight.begin(), query_weight.end(), query_weight.begin(),
 		    bind2nd(divides<float>(), query_weight_sum));
 	}
 	else 
@@ -596,12 +601,24 @@ void query_model(fs::path& basedir, bool no_result, bool no_facet, unsigned int 
 	// Collect non-zero id's
 	vector<unsigned int> rank;
 
+	// Simple skewness hack
+	float max_score = -10000.0;
+
 	for (unsigned int i = 1; i <= N; ++i) {
 	    if (!score[i]) continue;
 	    rank.push_back(i);
 
 	    // Add (3) back in
 	    score[i] -= qlen * log(dlen[i] + mu);
+	    if (score[i] > max_score) max_score = score[i];
+	}
+
+	if (simple_skewness) {
+	    float skew = 0.9 * (-max_score);
+	    for (unsigned int i = 1; i <= N; ++i) {
+		if (!score[i]) continue;
+		score[i] += skew;
+	    }
 	}
 
 	// Make a copy for faster facet lookup
