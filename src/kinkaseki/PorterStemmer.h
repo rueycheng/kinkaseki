@@ -1,6 +1,11 @@
 #ifndef KINKASEKI_PORTER_STEMMER_H
 #define KINKASEKI_PORTER_STEMMER_H
 
+#include <stdlib.h>  /* for malloc, free */
+#include <string.h>  /* for memcmp, memmove */
+
+namespace kinkaseki {
+
 /* This is the Porter stemming algorithm, coded up as thread-safe ANSI C
    by the author.
 
@@ -30,9 +35,6 @@
    regarded as release 1.)
 */
 
-#include <stdlib.h>  /* for malloc, free */
-#include <string.h>  /* for memcmp, memmove */
-
 /* You will probably want to move the following declarations to a central
    header file.
 */
@@ -52,58 +54,8 @@ extern "C" {
     int stem(struct stemmer * z, char * b, int k);
 }
 
-//--------------------------------------------------
-// #define main porter_main
-//-------------------------------------------------- 
-
-/*--------------------------------------------------
-* struct stemmer;
-* 
-* extern struct stemmer * create_stemmer(void);
-* extern void free_stemmer(struct stemmer * z);
-* 
-* extern int stem(struct stemmer * z, char * b, int k);
-*--------------------------------------------------*/
-
-
-
-/* The main part of the stemming algorithm starts here.
-*/
-
 #define TRUE 1
 #define FALSE 0
-
-/* stemmer is a structure for a few local bits of data,
-*/
-
-/*--------------------------------------------------
-* struct stemmer {
-*    char * b;       / * buffer for word to be stemmed * /
-*    int k;          / * offset to the end of the string * /
-*    int j;          / * a general offset into the string * /
-* };
-*--------------------------------------------------*/
-
-
-/* Member b is a buffer holding a word to be stemmed. The letters are in
-   b[0], b[1] ... ending at b[z->k]. Member k is readjusted downwards as
-   the stemming progresses. Zero termination is not in fact used in the
-   algorithm.
-
-   Note that only lower case sequences are stemmed. Forcing to lower case
-   should be done before stem(...) is called.
-
-
-   Typical usage is:
-
-       struct stemmer * z = create_stemmer();
-       char b[] = "pencils";
-       int res = stem(z, b, 6);
-           /- stem the 7 characters of b[0] to b[6]. The result, res,
-              will be 5 (the 's' is removed). -/
-       free_stemmer(z);
-*/
-
 
 extern struct stemmer * create_stemmer(void)
 {
@@ -204,7 +156,7 @@ static int cvc(struct stemmer * z, int i)
 
 /* ends(z, s) is TRUE <=> 0,...k ends with the string s. */
 
-static int ends(struct stemmer * z, char * s)
+static int ends(struct stemmer * z, const char * s)
 {  int length = s[0];
    char * b = z->b;
    int k = z->k;
@@ -218,7 +170,7 @@ static int ends(struct stemmer * z, char * s)
 /* setto(z, s) sets (j+1),...k to the characters in the string s, readjusting
    k. */
 
-static void setto(struct stemmer * z, char * s)
+static void setto(struct stemmer * z, const char * s)
 {  int length = s[0];
    int j = z->j;
    memmove(z->b + j + 1, s + 1, length);
@@ -227,7 +179,7 @@ static void setto(struct stemmer * z, char * s)
 
 /* r(z, s) is used further down. */
 
-static void r(struct stemmer * z, char * s) { if (m(z) > 0) setto(z, s); }
+static void r(struct stemmer * z, const char * s) { if (m(z) > 0) setto(z, s); }
 
 /* step1ab(z) gets rid of plurals and -ed or -ing. e.g.
 
@@ -381,7 +333,7 @@ static void step5(struct stemmer * z)
    z->j = z->k;
    if (b[z->k] == 'e')
    {  int a = m(z);
-      if (a > 1 || a == 1 && !cvc(z, z->k - 1)) z->k--;
+      if (a > 1 || (a == 1 && !cvc(z, z->k - 1))) z->k--;
    }
    if (b[z->k] == 'l' && doublec(z, z->k) && m(z) > 1) z->k--;
 }
@@ -408,75 +360,20 @@ extern int stem(struct stemmer * z, char * b, int k)
 }
 
 //--------------------------------------------------
-// /*--------------------stemmer definition ends here------------------------*/
-// 
-// #include <stdio.h>
-// #include <stdlib.h>      /* for malloc, free */
-// #include <ctype.h>       /* for isupper, islower, tolower */
-// 
-// static char * s;         /* buffer for words tobe stemmed */
-// 
-// #define INC 50           /* size units in which s is increased */
-// static int i_max = INC;  /* maximum offset in s */
-// 
-// #define LETTER(ch) (isupper(ch) || islower(ch))
-// 
-// void stemfile(struct stemmer * z, FILE * f)
-// {  while(TRUE)
-//    {  int ch = getc(f);
-//       if (ch == EOF) return;
-//       if (LETTER(ch))
-//       {  int i = 0;
-//          while(TRUE)
-//          {  if (i == i_max)
-//             {  i_max += INC;
-//                s = realloc(s, i_max + 1);
-//             }
-//             ch = tolower(ch); /* forces lower case */
-// 
-//             s[i] = ch; i++;
-//             ch = getc(f);
-//             if (!LETTER(ch)) { ungetc(ch,f); break; }
-//          }
-//          s[stem(z, s, i - 1) + 1] = 0;
-//          /* the previous line calls the stemmer and uses its result to
-//             zero-terminate the string in s */
-//          printf("%s",s);
-//       }
-//       else putchar(ch);
-//    }
-// }
-//-------------------------------------------------- 
-
-//--------------------------------------------------
-// int main(int argc, char * argv[])
-// {  int i;
-// 
-//    struct stemmer * z = create_stemmer();
-// 
-//    s = (char *) malloc(i_max + 1);
-//    for (i = 1; i < argc; i++)
-//    {  FILE * f = fopen(argv[i],"r");
-//       if (f == 0) { fprintf(stderr,"File %s not found\n",argv[i]); exit(1); }
-//       stemfile(z, f);
-//    }
-//    free(s);
-// 
-//    free_stemmer(z);
-// 
-//    return 0;
-// }
-//-------------------------------------------------- 
-
-//--------------------------------------------------
 // PorterStemmer
 //-------------------------------------------------- 
 class PorterStemmer {
-    struct stemmer* _stem;
+    struct stemmer* ps;
 
 public:
-    PorterStemmer() { _stem = create_stemmer(); }
-    ~PorterStemmer() { free_stemmer(_stem); }
+    PorterStemmer() { 
+	ps = create_stemmer(); 
+    }
+
+    ~PorterStemmer() { 
+	free_stemmer(ps); 
+    }
+
     std::string stem(const char* p, int k) {
 	if (k >= 1024) return std::string(); // Skip this term
 
@@ -485,7 +382,7 @@ public:
 	for (int i = 0; i <= k; i++) 
 	    buf[i] = (p[i] >= 'A' && p[i] <= 'Z')? p[i] - 'A' + 'a': p[i];
 
-	int kk = ::stem(_stem, buf, k); 
+	int kk = kinkaseki::stem(ps, buf, k); 
 	return std::string(buf, kk + 1);
     }
 
@@ -493,5 +390,7 @@ public:
 	return stem(s.c_str(), s.size() - 1);
     }
 };
+
+}
 
 #endif
