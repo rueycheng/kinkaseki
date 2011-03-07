@@ -325,7 +325,6 @@ ID: $(HEADERS) $(SOURCES) $(LISP) $(TAGS_FILES)
 	  $(AWK) '{ files[$$0] = 1; nonempty = 1; } \
 	      END { if (nonempty) { for (i in files) print i; }; }'`; \
 	mkid -fID $$unique
-tags: TAGS
 
 TAGS: tags-recursive $(HEADERS) $(SOURCES) config.h.in $(TAGS_DEPENDENCIES) \
 		$(TAGS_FILES) $(LISP)
@@ -674,6 +673,9 @@ uninstall-am:
 	maintainer-clean-generic mostlyclean mostlyclean-generic pdf \
 	pdf-am ps ps-am tags tags-recursive uninstall uninstall-am
 
+
+tags:
+	ctags -R src
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
