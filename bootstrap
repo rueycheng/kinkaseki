@@ -33,5 +33,5 @@ fi
 [ -e configure.in ] \
     && echo "$ME: running aclocal" && aclocal \
     && echo "$ME: running autoheader" && autoheader \
-    && echo "$ME: running automake --gnu --add-missing" && automake --gnu --add-missing \
+    && echo "$ME: running automake --gnu --add-missing --copy" && automake --gnu --add-missing --copy\
     && echo "$ME: running autoconf" && autoconf
