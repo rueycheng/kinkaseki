@@ -10,38 +10,10 @@
 #include "common.h"
 #include "compat.h"
 
+#include "kinkaseki/PorterStemmer.h"
+
 using namespace std;
 using namespace magicbox;
-
-//--------------------------------------------------
-// PorterStemmer
-//-------------------------------------------------- 
-extern "C" {
-#include "porter.h"
-}
-
-class PorterStemmer {
-    struct stemmer* _stem;
-
-public:
-    PorterStemmer() { _stem = create_stemmer(); }
-    ~PorterStemmer() { free_stemmer(_stem); }
-    std::string stem(const char* p, int k) {
-	if (k >= 1024) return std::string(); // Skip this term
-
-	char buf[1024];
-	buf[k + 1] = 0;
-	for (int i = 0; i <= k; i++) 
-	    buf[i] = (p[i] >= 'A' && p[i] <= 'Z')? p[i] - 'A' + 'a': p[i];
-
-	int kk = ::stem(_stem, buf, k); 
-	return std::string(buf, kk + 1);
-    }
-
-    std::string stem(const std::string& s) {
-	return stem(s.c_str(), s.size() - 1);
-    }
-};
 
 //--------------------------------------------------
 // Main program

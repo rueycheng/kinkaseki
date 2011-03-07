@@ -1,5 +1,6 @@
 bin_PROGRAMS = tokenize collect compile kmeans blm
-tokenize_SOURCES = tokenize.cpp compat.h magicbox.h porter.c porter.h
+#  tokenize_SOURCES = tokenize.cpp compat.h magicbox.h porter.c porter.h
+tokenize_SOURCES = tokenize.cpp compat.h magicbox.h 
 collect_SOURCES = collect.cpp compat.h magicbox.h
 compile_SOURCES = compile.cpp compat.h magicbox.h
 kmeans_SOURCES = kmeans.cpp compat.h magicbox.h

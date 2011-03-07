@@ -1,7 +1,9 @@
+*.o
+.*.swp
+.deps
+a.out
+blm
 collect
 compile
 kmeans
 tokenize
-blm
-*.o
-.deps
