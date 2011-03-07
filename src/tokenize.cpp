@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
     }
 
     {
-	PorterStemmer ps;
+	kinkaseki::PorterStemmer ps;
 	string line;
 
 	bool do_stem = g["stem"];
