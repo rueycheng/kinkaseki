@@ -3,8 +3,15 @@
 #include "compat.h"
 #include "kinkaseki/CLI.h"
 
+#define foreach BOOST_FOREACH
+
+#include <unordered_map>
+
 int main(int argc, char** argv) {
-    kinkaseki::CLI cli(argc, argv);
+    using namespace std;
+    using kinkaseki::CLI;
+
+    CLI cli(argc, argv);
 
     cli
 	.bind("verbose", "Show verbose output")
@@ -13,11 +20,50 @@ int main(int argc, char** argv) {
 	    "  No concrete example so far.\n"
 	);
 
-    std::vector<std::string> args = cli.parse();
+    vector<string> args = cli.parse();
 
-    BOOST_FOREACH (std::string& arg, args) {
-	std::cout << arg << "\n";
+    // Main program starts here
+    //
+    // Step 1: House keeping
+    vector<unsigned int> text;
+    unordered_map<string, unsigned int> lexicon;
+    unsigned int nextID = 0;
+
+    lexicon["<>"] = 0; // means 'empty'
+    lexicon["<eol>"] = 1; // mean 'end-of-line'
+
+    text.push_back(1); // The first token is an <eol>
+
+    string line;
+    while (getline(cin, line)) {
+	istringstream sin(line);
+	string token;
+	unsigned int tokenID;
+
+	while (sin >> token) {
+	    // FIXME: Optimize this line
+	    if (lexicon.find(token) == lexicon.end()) 
+		lexicon.insert(make_pair(token, tokenID = nextID++));
+	    else
+		tokenID = lexicon[token];
+
+	    text.push_back(tokenID);
+	}
+
+	text.push_back(1); // Of course there is an <eol>
     }
+
+    // Step 2: Create posting lists
+    //
+    // We assume the size of the text stream fits into a 4-byte integer
+    // From now on, we'll call each token as a 'Unigram'
+
+    typedef unsigned int Unigram;
+    typedef pair<unsigned int, unsigned int> Bigram;
+    typedef vector<unsigned int> PostingList;
+
+    unordered_map<Unigram, PostingList> unigram;
+    unordered_map<Bigram, PostingList> bigram;
 
     return 0;
 }
