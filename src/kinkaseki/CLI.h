@@ -22,6 +22,7 @@ class CLI {
     std::string usage;
     std::string synopsis;
     std::string texts;
+    std::string version;
 
     po::options_description visible;
     po::options_description hidden;
@@ -63,6 +64,7 @@ public:
     CLI& setUsage(const char* u) { usage = u; return *this; }
     CLI& setSynopsis(const char* s) { synopsis = s; return *this; }
     CLI& setTexts(const char* t) { texts = t; return *this; }
+    CLI& setVersion(const char* v) { version = v; return *this; }
 
     // Commit the settings via boost framework
     std::vector<std::string> parse() {
@@ -70,7 +72,7 @@ public:
 
 	visible.add_options()
 	    ("help", "Show this help screen")
-	    ("version", "Output version into");
+	    ("version", "Show the version into");
 
 	try {
 	    po::options_description all;
@@ -86,30 +88,44 @@ public:
 	} catch (po::invalid_option_value e) {}
 
 	if (vm.count("help")) {
-	    std::string help_usage = 
-		"Usage: " + basename(argv[0]) + " [OPTION..]";
+	    showHelp();
+	    exit(0);
+	}
 
-	    if (usage != "") {
-		help_usage += " ";
-		help_usage += usage;
-	    }
-
-	    help_usage += "\n";
-
-	    // Just in case I need to modify these ...
-	    std::string help_synopsis = 
-		(synopsis == "")? "<<< NO SYNOPSIS >>>\n": synopsis;
-
-	    std::string help_texts = texts;
-
-	    out << help_usage;
-	    out << help_synopsis << "\n";
-	    out << visible << "\n";
-	    out << help_texts;
+	if (vm.count("version")) {
+	    showVersion();
 	    exit(0);
 	}
 
 	return passthrough;
+    }
+
+    void showHelp() {
+	std::string help_usage = 
+	    "Usage: " + basename(argv[0]) + " [OPTION..]";
+
+	if (usage != "") {
+	    help_usage += " ";
+	    help_usage += usage;
+	}
+
+	help_usage += "\n";
+
+	// Just in case I need to modify these ...
+	std::string help_synopsis = 
+	    (synopsis == "")? "<<< NO SYNOPSIS >>>\n": synopsis;
+
+	std::string help_texts = texts;
+
+	out << help_usage;
+	out << help_synopsis << "\n";
+	out << visible << "\n";
+	out << help_texts;
+    }
+
+    void showVersion() {
+	if (version == "") return;
+	out << version << "\n";
     }
 
     // Tiny wrapper over variable_maps::count().  Comes in handy
