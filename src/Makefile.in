@@ -33,7 +33,7 @@ NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
 bin_PROGRAMS = tokenize$(EXEEXT) collect$(EXEEXT) compile$(EXEEXT) \
-	kmeans$(EXEEXT) blm$(EXEEXT)
+	kmeans$(EXEEXT) blm$(EXEEXT) glue$(EXEEXT)
 @USE_CXX0X_TRUE@am__append_1 = -std=c++0x
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in compile
@@ -57,6 +57,9 @@ collect_LDADD = $(LDADD)
 am_compile_OBJECTS = compile.$(OBJEXT)
 compile_OBJECTS = $(am_compile_OBJECTS)
 compile_LDADD = $(LDADD)
+am_glue_OBJECTS = glue.$(OBJEXT)
+glue_OBJECTS = $(am_glue_OBJECTS)
+glue_LDADD = $(LDADD)
 am_kmeans_OBJECTS = kmeans.$(OBJEXT)
 kmeans_OBJECTS = $(am_kmeans_OBJECTS)
 kmeans_LDADD = $(LDADD)
@@ -77,9 +80,9 @@ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 SOURCES = $(blm_SOURCES) $(collect_SOURCES) $(compile_SOURCES) \
-	$(kmeans_SOURCES) $(tokenize_SOURCES)
+	$(glue_SOURCES) $(kmeans_SOURCES) $(tokenize_SOURCES)
 DIST_SOURCES = $(blm_SOURCES) $(collect_SOURCES) $(compile_SOURCES) \
-	$(kmeans_SOURCES) $(tokenize_SOURCES)
+	$(glue_SOURCES) $(kmeans_SOURCES) $(tokenize_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -173,14 +176,14 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-#  tokenize_SOURCES = tokenize.cpp compat.h magicbox.h porter.c porter.h
 tokenize_SOURCES = tokenize.cpp compat.h magicbox.h 
 collect_SOURCES = collect.cpp compat.h magicbox.h
 compile_SOURCES = compile.cpp compat.h magicbox.h
 kmeans_SOURCES = kmeans.cpp compat.h magicbox.h
 blm_SOURCES = blm.cpp compat.h magicbox.h
+glue_SOURCES = glue.cpp compat.h kinkaseki/CLI.h
+
 #--------------------------------------------------
-# bin_PROGRAMS = gii_parse gii_tokenize gii_index gii_model1 gii_model2 gii_model3 sim merge lda slda
 # gii_parse_SOURCES = gii_parse.cpp magicbox.h expatpp.h expatpp_callback.h gii_parse.h
 # gii_tokenize_SOURCES = gii_tokenize.cpp porter.c porter.h magicbox.h gii_tokenize.h
 # gii_index_SOURCES = gii_index.cpp magicbox.h
@@ -191,11 +194,6 @@ blm_SOURCES = blm.cpp compat.h magicbox.h
 # merge_SOURCES = merge.cpp magicbox.h
 # lda_SOURCES = lda.cpp magicbox.h
 # slda_SOURCES = slda.cpp magicbox.h
-#-------------------------------------------------- 
-
-#--------------------------------------------------
-# bin_PROGRAMS += prep
-# prep_SOURCES = prep.cpp magicbox.h
 #-------------------------------------------------- 
 AM_LDFLAGS = -lboost_program_options-mt -lboost_filesystem-mt
 AM_CXXFLAGS = -Wall $(am__append_1)
@@ -280,6 +278,9 @@ collect$(EXEEXT): $(collect_OBJECTS) $(collect_DEPENDENCIES)
 compile$(EXEEXT): $(compile_OBJECTS) $(compile_DEPENDENCIES) 
 	@rm -f compile$(EXEEXT)
 	$(CXXLINK) $(compile_OBJECTS) $(compile_LDADD) $(LIBS)
+glue$(EXEEXT): $(glue_OBJECTS) $(glue_DEPENDENCIES) 
+	@rm -f glue$(EXEEXT)
+	$(CXXLINK) $(glue_OBJECTS) $(glue_LDADD) $(LIBS)
 kmeans$(EXEEXT): $(kmeans_OBJECTS) $(kmeans_DEPENDENCIES) 
 	@rm -f kmeans$(EXEEXT)
 	$(CXXLINK) $(kmeans_OBJECTS) $(kmeans_LDADD) $(LIBS)
@@ -296,6 +297,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/blm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/collect.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/compile.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/glue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/kmeans.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tokenize.Po@am__quote@
 
