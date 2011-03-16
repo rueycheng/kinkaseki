@@ -5,6 +5,8 @@
 
 #define foreach BOOST_FOREACH
 
+#include <iterator>
+#include <boost/functional/hash.hpp>
 #include <unordered_map>
 
 int main(int argc, char** argv) {
@@ -57,13 +59,28 @@ int main(int argc, char** argv) {
     //
     // We assume the size of the text stream fits into a 4-byte integer
     // From now on, we'll call each token as a 'Unigram'
-
     typedef unsigned int Unigram;
     typedef pair<unsigned int, unsigned int> Bigram;
     typedef vector<unsigned int> PostingList;
 
-    unordered_map<Unigram, PostingList> unigram;
-    unordered_map<Bigram, PostingList> bigram;
+    unordered_map<Unigram, PostingList, boost::hash<Unigram> > unigram;
+    unordered_map<Bigram, PostingList, boost::hash<Bigram> > bigram;
+
+    {
+	vector<unsigned int>::iterator iter = text.begin(), first = text.begin();
+	vector<unsigned int>::iterator last = text.end();
+
+	++iter; // Go one step ahead
+
+	while (iter != last) {
+	    Unigram u = *iter;
+	    Bigram b = Bigram(*(iter - 1), *iter);
+
+	    unigram[u].push_back(distance(first, iter));
+	    bigram[b].push_back(distance(first, iter - 1));
+	    ++iter;
+	}
+    }
 
     return 0;
 }
