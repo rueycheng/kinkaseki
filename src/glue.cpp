@@ -8,6 +8,21 @@
 #include <iterator>
 #include <boost/functional/hash.hpp>
 #include <unordered_map>
+#include <algorithm>
+
+template<typename UnigramMap, typename BigramMap>
+struct MoreEntropyGain {
+    UnigramMap& umap;
+    BigramMap& bmap;
+
+    MoreEntropyGain(UnigramMap& um, BigramMap& bm): umap(um), bmap(bm) {}
+    bool operator()(typename BigramMap::key_type x, typename BigramMap::key_type y) {
+	unsigned int fx = bmap[x].size();
+	unsigned int fy = bmap[y].size();
+
+	return fx > fy;
+    }
+};
 
 int main(int argc, char** argv) {
     using namespace std;
@@ -80,6 +95,33 @@ int main(int argc, char** argv) {
 	    bigram[b].push_back(distance(first, iter - 1));
 	    ++iter;
 	}
+    }
+
+    // Step 3: Create a heap
+    //
+    // More detail later
+    vector<Bigram> heap;
+    heap.reserve(bigram.size());
+
+    MoreEntropyGain<
+	unordered_map<Unigram, PostingList, boost::hash<Unigram> >,
+	unordered_map<Bigram, PostingList, boost::hash<Bigram> > 
+	>
+	compare(unigram, bigram);
+
+    {
+	unordered_map<Bigram, PostingList, boost::hash<Bigram> >
+	    ::const_iterator iter = bigram.begin(), last = bigram.end();
+
+	while (iter != last) heap.push_back(iter->first);
+
+	make_heap(heap.begin(), heap.end(), compare);
+    }
+
+    while (!heap.empty()) {
+	Bigram& top = heap.front();
+	cout << bigram[top].size() << ' ' << top.first << ' ' << top.second << ' ' << "\n";
+	pop_heap(heap.begin(), heap.end(), compare);
     }
 
     return 0;
