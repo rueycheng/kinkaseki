@@ -9,6 +9,7 @@
 #include <iterator>
 #include <boost/functional/hash.hpp>
 #include <algorithm>
+#include <ext/functional>
 
 //--------------------------------------------------
 // Home-made priority queue
@@ -143,7 +144,6 @@ public:
     }
 };
 
-
 //--------------------------------------------------
 // Helper functions
 //-------------------------------------------------- 
@@ -160,6 +160,36 @@ struct MoreEntropyGain {
 	return fx < fy;
     }
 };
+
+template<typename Pair, typename Predicate>
+struct Choose1st {
+    Predicate pred;
+
+    bool operator()(const Pair& x, const Pair& y) {
+	return pred(x.first, y.first);
+    }
+};
+
+template<typename Pair, typename Predicate>
+Choose1st<Pair, Predicate> choose1st(Predicate pred) {
+    return Choose1st<Pair, Predicate>();
+}
+
+template<typename Pair, typename Predicate>
+struct Choose2nd {
+    Predicate pred;
+
+    Choose2nd() {}
+
+    bool operator()(const Pair& x, const Pair& y) {
+	return pred(x.second, y.second);
+    }
+};
+
+template<typename Pair, typename Predicate>
+Choose2nd<Pair, Predicate> choose2nd(Predicate pred) {
+    return Choose2nd<Pair, Predicate>();
+}
 
 //--------------------------------------------------
 // Main program goes here
@@ -181,7 +211,8 @@ int main(int argc, char** argv) {
 
     // Main program starts here
     //
-    // Step 1: House keeping
+    // Step 1: Read input and store them as a token stream
+    //         Note the ``special tokens''
     vector<unsigned int> text;
     unordered_map<string, unsigned int> lexicon;
     unsigned int nextID = 0;
@@ -212,60 +243,93 @@ int main(int argc, char** argv) {
 
     // Step 2: Create posting lists
     //
-    // We assume the size of the text stream fits into a 4-byte integer
-    // From now on, we'll call each token as a 'Unigram'
+    // We assume the size of the text stream fits into a 4-byte integer.
+    // From now on, we'll call each token as a 'Unigram'.
     typedef unsigned int Unigram;
     typedef pair<unsigned int, unsigned int> Bigram;
     typedef vector<unsigned int> PostingList;
 
-    unordered_map<Unigram, PostingList, boost::hash<Unigram> > unigram;
-    unordered_map<Bigram, PostingList, boost::hash<Bigram> > bigram;
+    // NOTE: We keep track of the positions for each unigram (and thus we know
+    // the frequencies).  For bigram, we only save the counts.
+    typedef vector<PostingList> UnigramIndex;
+    typedef unordered_map<Bigram, unsigned int, boost::hash<Bigram> > BigramIndex;
+
+    UnigramIndex unigram(lexicon.size());
+    BigramIndex bigram(lexicon.size());
 
     {
-	vector<unsigned int>::iterator iter = text.begin(), first = text.begin();
-	vector<unsigned int>::iterator last = text.end();
+	vector<unsigned int>::iterator first = text.begin(), last = text.end();
+	vector<unsigned int>::iterator iter = first;
 
-	++iter; // Go one step ahead
+	Unigram prev = 1, curr;
 
 	while (iter != last) {
-	    Unigram u = *iter;
-	    Bigram b = Bigram(*(iter - 1), *iter);
+	    curr = *iter;
 
-	    unigram[u].push_back(distance(first, iter));
-	    bigram[b].push_back(distance(first, iter - 1));
+	    if (curr != 1) {
+		unigram[curr].push_back(distance(first, iter));
+		if (prev != 1) bigram[Bigram(prev, curr)]++;
+	    }
+
+	    prev = curr;
 	    ++iter;
 	}
     }
 
-    // Step 3: Create a heap
+    // Step 3: Populate the top-k bigrams
     //
     // More detail later
-    vector<Bigram> heap;
-    heap.reserve(bigram.size());
+    typedef pair<Bigram, float> BigramScore;
 
-    MoreEntropyGain<
-	unordered_map<Unigram, PostingList, boost::hash<Unigram> >,
-	unordered_map<Bigram, PostingList, boost::hash<Bigram> > 
-	>
-	compare(unigram, bigram);
+    vector<BigramScore> score(bigram.size());
 
     {
-	unordered_map<Bigram, PostingList, boost::hash<Bigram> >
-	    ::const_iterator iter = bigram.begin(), last = bigram.end();
+	BigramIndex::iterator iter = bigram.begin(), last = bigram.end();
+	while (iter != last) { 
+	    int f_x = unigram[iter->first.first].size();
+	    int f_y = unigram[iter->first.second].size();
+	    int f_xy = iter->second;
+	    float g = std::log(f_x - f_xy) + std::log(f_y - f_xy) - std::log(f_xy);
 
-	while (iter != last)
-	    heap.push_back(iter++->first);
-
-	make_heap(heap.begin(), heap.end(), compare);
-
-	while (!heap.empty()) {
-	    Bigram& top = heap.front();
-	    cout << bigram[top].size() << ' ' << heap.size() << ' ' << top.first << ' ' << top.second << ' ' << "\n";
-
-	    pop_heap(heap.begin(), heap.end(), compare);
-	    heap.pop_back();
+	    score.push_back(BigramScore(iter->first, g));
 	}
+
+	partial_sort(
+	    score.begin(), 
+	    score.begin() + 10, 
+	    score.end(), 
+	    choose2nd<BigramScore>(std::less<float>())
+	);
     }
+
+//--------------------------------------------------
+//     vector<Bigram> heap;
+//     heap.reserve(bigram.size());
+// 
+//     MoreEntropyGain<
+// 	unordered_map<Unigram, PostingList, boost::hash<Unigram> >,
+// 	unordered_map<Bigram, PostingList, boost::hash<Bigram> > 
+// 	>
+// 	compare(unigram, bigram);
+// 
+//     {
+// 	unordered_map<Bigram, PostingList, boost::hash<Bigram> >
+// 	    ::const_iterator iter = bigram.begin(), last = bigram.end();
+// 
+// 	while (iter != last)
+// 	    heap.push_back(iter++->first);
+// 
+// 	make_heap(heap.begin(), heap.end(), compare);
+// 
+// 	while (!heap.empty()) {
+// 	    Bigram& top = heap.front();
+// 	    cout << bigram[top].size() << ' ' << heap.size() << ' ' << top.first << ' ' << top.second << ' ' << "\n";
+// 
+// 	    pop_heap(heap.begin(), heap.end(), compare);
+// 	    heap.pop_back();
+// 	}
+//     }
+//-------------------------------------------------- 
 
     return 0;
 }
