@@ -147,20 +147,6 @@ public:
 //--------------------------------------------------
 // Helper functions
 //-------------------------------------------------- 
-template<typename UnigramMap, typename BigramMap>
-struct MoreEntropyGain {
-    UnigramMap& umap;
-    BigramMap& bmap;
-
-    MoreEntropyGain(UnigramMap& um, BigramMap& bm): umap(um), bmap(bm) {}
-    bool operator()(typename BigramMap::key_type x, typename BigramMap::key_type y) {
-	unsigned int fx = bmap[x].size();
-	unsigned int fy = bmap[y].size();
-
-	return fx < fy;
-    }
-};
-
 template<typename Pair, typename Predicate>
 struct Choose1st {
     Predicate pred;
@@ -178,8 +164,6 @@ Choose1st<Pair, Predicate> choose1st(Predicate pred) {
 template<typename Pair, typename Predicate>
 struct Choose2nd {
     Predicate pred;
-
-    Choose2nd() {}
 
     bool operator()(const Pair& x, const Pair& y) {
 	return pred(x.second, y.second);
@@ -215,10 +199,12 @@ int main(int argc, char** argv) {
     //         Note the ``special tokens''
     vector<unsigned int> text;
     unordered_map<string, unsigned int> lexicon;
-    unsigned int nextID = 0;
+    vector<string> inv_lexicon;
 
     lexicon["<>"] = 0; // means 'empty'
+    inv_lexicon.push_back("<>");
     lexicon["<eol>"] = 1; // mean 'end-of-line'
+    inv_lexicon.push_back("<eol>");
 
     text.push_back(1); // The first token is an <eol>
 
@@ -230,8 +216,10 @@ int main(int argc, char** argv) {
 
 	while (sin >> token) {
 	    // FIXME: Optimize this line
-	    if (lexicon.find(token) == lexicon.end()) 
-		lexicon.insert(make_pair(token, tokenID = nextID++));
+	    if (lexicon.find(token) == lexicon.end()) {
+		lexicon.insert(make_pair(token, tokenID = inv_lexicon.size()));
+		inv_lexicon.push_back(token);
+	    }
 	    else
 		tokenID = lexicon[token];
 
@@ -276,60 +264,151 @@ int main(int argc, char** argv) {
 	}
     }
 
-    // Step 3: Populate the top-k bigrams
-    //
-    // More detail later
-    typedef pair<Bigram, float> BigramScore;
+    // FIXME: Don't wanna run forever
+    while (true) {
+	// Step 3: Populate the top-k bigrams
+	//
+	// More detail later
+	typedef pair<Bigram, float> BigramScore;
 
-    vector<BigramScore> score(bigram.size());
+	vector<Bigram> topBigram(10);
 
-    {
-	BigramIndex::iterator iter = bigram.begin(), last = bigram.end();
-	while (iter != last) { 
-	    int f_x = unigram[iter->first.first].size();
-	    int f_y = unigram[iter->first.second].size();
-	    int f_xy = iter->second;
-	    float g = std::log(f_x - f_xy) + std::log(f_y - f_xy) - std::log(f_xy);
+	{
+	    vector<BigramScore> score(bigram.size());
 
-	    score.push_back(BigramScore(iter->first, g));
+	    BigramIndex::iterator iter = bigram.begin(), last = bigram.end();
+	    while (iter != last) { 
+		int f_x = unigram[iter->first.first].size();
+		int f_y = unigram[iter->first.second].size();
+		int f_xy = iter->second;
+		float g = std::log(f_x - f_xy) + std::log(f_y - f_xy) - std::log(f_xy);
+
+		score.push_back(BigramScore(iter->first, g));
+	    }
+
+	    partial_sort(
+		score.begin(), 
+		score.begin() + 10, 
+		score.end(), 
+		choose2nd<BigramScore>(std::greater<float>())
+	    );
+
+	    transform(
+		score.begin(), 
+		score.begin() + 10, 
+		back_inserter(topBigram),
+		__gnu_cxx::select1st<BigramScore>()
+	    );
 	}
 
-	partial_sort(
-	    score.begin(), 
-	    score.begin() + 10, 
-	    score.end(), 
-	    choose2nd<BigramScore>(std::less<float>())
-	);
-    }
+	// Step 4: Scan-Rewrite procedure
+	//
+	// More detail later
+	unsigned int maxPos = text.size();
 
-//--------------------------------------------------
-//     vector<Bigram> heap;
-//     heap.reserve(bigram.size());
-// 
-//     MoreEntropyGain<
-// 	unordered_map<Unigram, PostingList, boost::hash<Unigram> >,
-// 	unordered_map<Bigram, PostingList, boost::hash<Bigram> > 
-// 	>
-// 	compare(unigram, bigram);
-// 
-//     {
-// 	unordered_map<Bigram, PostingList, boost::hash<Bigram> >
-// 	    ::const_iterator iter = bigram.begin(), last = bigram.end();
-// 
-// 	while (iter != last)
-// 	    heap.push_back(iter++->first);
-// 
-// 	make_heap(heap.begin(), heap.end(), compare);
-// 
-// 	while (!heap.empty()) {
-// 	    Bigram& top = heap.front();
-// 	    cout << bigram[top].size() << ' ' << heap.size() << ' ' << top.first << ' ' << top.second << ' ' << "\n";
-// 
-// 	    pop_heap(heap.begin(), heap.end(), compare);
-// 	    heap.pop_back();
-// 	}
-//     }
-//-------------------------------------------------- 
+	foreach (const Bigram& b, topBigram) {
+	    unsigned int x = b.first;
+	    unsigned int y = b.second;
+
+	    cout << "Process " << inv_lexicon[x] << ' ' << inv_lexicon[y] << "\n";
+
+	    // (1) Prepare the posting lists for x, y, and xy
+	    PostingList::iterator 
+		xiter = unigram[x].begin(), xlast = unigram[x].end();
+	    PostingList::iterator 
+		yiter = unigram[y].begin(), ylast = unigram[y].end();
+	    PostingList pl_x, pl_y, pl_xy;
+
+	    while (xiter != xlast && yiter != ylast) {
+		if (*xiter < *yiter) {
+		    unsigned int nextPos = *xiter + 1;
+		    while (nextPos < maxPos && text[nextPos] == 0) ++nextPos;
+
+		    if (nextPos == *yiter) {
+			pl_xy.push_back(*xiter);
+			++xiter;
+			++yiter;
+		    }
+		    else
+			pl_x.push_back(*xiter++);
+		}
+		else
+		    pl_y.push_back(*yiter++);
+	    }
+
+	    // (2) Prepare the update, the decrement, and the increment lists
+	    unordered_set<Bigram, boost::hash<Bigram> > update;
+	    unordered_set<unsigned int> decrement;
+	    unordered_set<unsigned int> increment;
+
+	    // (3) Mark immediate neighbors of ``xy'' and correct the counts
+	    // i.e., the decrement list
+	    foreach (unsigned int pos, pl_xy) {
+		unsigned int prevPos = pos - 1, nextPos = pos + 1;
+		while (prevPos >= 0 && text[prevPos] == 0) --prevPos;
+		while (nextPos < maxPos && text[nextPos] == 0) ++nextPos;
+
+		unsigned int nextPos2 = nextPos + 1;
+		while (nextPos2 < maxPos && text[nextPos2] == 0) ++nextPos2;
+
+		if (prevPos >= 0 && text[prevPos] != 1) 
+		    decrement.insert(prevPos); // do ``ax'' if a exists
+
+		decrement.insert(pos); // always do ``xy''
+
+		if (nextPos2 < maxPos && text[nextPos2] != 1) 
+		    decrement.insert(nextPos); // do ``yb'' if b exists
+	    }
+
+	    foreach (unsigned int pos, decrement) {
+		unsigned int nextPos = pos;
+		while (text[++nextPos] == 0) ; // just being slack
+
+		Bigram b(text[pos], text[nextPos]);
+		update.insert(b);
+		bigram[b]--;
+	    }
+
+	    // (4) Rewrite ``xy'' as ``z0'' (0 as the padding symbol)
+	    
+	    // FIXME: Check if this is consistent to the lexicon
+	    unsigned int z = inv_lexicon.size();
+	    inv_lexicon.push_back(inv_lexicon[x] + inv_lexicon[y]);
+
+	    foreach (unsigned int pos, pl_xy) {
+		unsigned int nextPos = pos;
+		while (text[++nextPos] == 0) ; // being slack again
+
+		text[pos] = z;
+		text[nextPos] = 0;
+
+		unsigned int prevPos = pos - 1, nextPos2 = nextPos + 1;
+		while (prevPos >= 0 && text[prevPos] == 0) --prevPos;
+		while (nextPos2 < maxPos && text[nextPos2] == 0) ++nextPos2;
+
+		if (prevPos >= 0 && text[prevPos] != 1) 
+		    increment.insert(prevPos); // do ``az'' if a exists
+
+		if (nextPos2 < maxPos && text[nextPos2] != 1)
+		    increment.insert(pos); // do ``zb'' if b exists
+	    }
+
+	    foreach (unsigned int pos, increment) {
+		unsigned int nextPos = pos;
+		while (text[++nextPos] == 0) ; // just being slack here
+
+		Bigram b(text[pos], text[nextPos]);
+		update.insert(b);
+		bigram[b]++;
+	    }
+
+	    // (5) Renew the posting lists
+	    unigram.push_back(PostingList());
+	    unigram[x] = pl_x;
+	    unigram[y] = pl_y;
+	    unigram[z] = pl_xy;
+	}
+    }
 
     return 0;
 }
