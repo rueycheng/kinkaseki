@@ -6,29 +6,37 @@
 #include <cmath>
 #include <numeric>
 
-#include "magicbox.h"
-#include "common.h"
-#include "compat.h"
+#include <boost/algorithm/string.hpp>
+#include <boost/foreach.hpp>
+#define foreach BOOST_FOREACH
 
+#include "compat.h"
+#include "kinkaseki/CLI.h"
 #include "kinkaseki/PorterStemmer.h"
+#include "kinkaseki/CJKVSeparator.h"
 
 using namespace std;
-using namespace magicbox;
 
 //--------------------------------------------------
 // Main program
 //-------------------------------------------------- 
 int main(int argc, char** argv) {
 
-    // Getopt
-    Getopt g(argc, argv);
-    g   << $("no-act,n", "Do nothing")
-	<< $("stem", "Explicitly lemmatize all the tokens")
-	<< $("utf8", "Use cjkv_separator instead")
-	<< $$$("[options..]");
+    kinkaseki::CLI cli(argc, argv);
+
+    bool do_stem = false;
+    bool do_utf8 = false;
+
+    cli
+	.bind("no-act,n", "Do nothing")
+	.bind(do_stem, "stem", "Explicitly lemmatize all tokens")
+	.bind(do_utf8, "utf8", "Use CJKVSeparator instead")
+	.setSynopsis("Tokenize the input");
+
+    cli.parse();
 
     // Bypass as necessary
-    if (g["no-act"]) {
+    if (cli["no-act"]) {
 	cout << cin.rdbuf();
 	return 0;
     }
@@ -58,14 +66,12 @@ int main(int argc, char** argv) {
 	kinkaseki::PorterStemmer ps;
 	string line;
 
-	bool do_stem = g["stem"];
-	bool do_utf8 = g["utf8"];
-
 	while (getline(cin, line)) {
 	    boost::to_lower(line);
 
 	    if (do_utf8) {
-		CJKVTokenizer tok(line);
+		// CJKVTokenizer tok(line);
+		boost::tokenizer<kinkaseki::CJKVSeparator> tok(line);
 		foreach (const string& t, tok) { 
  		    if (stopword.find(t) != stopword.end() || t.size() < 3 || t.size() > 25) continue;
 		    if (!do_stem) cout << t << ' ';
