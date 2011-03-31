@@ -1,6 +1,5 @@
 #include <iostream>
 #include <boost/foreach.hpp>
-#include "compat.h"
 #include "kinkaseki/CLI.h"
 
 #define foreach BOOST_FOREACH
