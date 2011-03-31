@@ -2,7 +2,6 @@
 #define KINKASEKI_CLI_H
 
 #include <iosfwd>
-#include <string>
 #include <vector>
 #include <boost/program_options.hpp>
 #include <boost/lexical_cast.hpp>
