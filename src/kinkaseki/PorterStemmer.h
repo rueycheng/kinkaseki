@@ -374,6 +374,11 @@ public:
 	free_stemmer(ps); 
     }
 
+    // NOTE: This is so important
+    PorterStemmer(const PorterStemmer&) { 
+	ps = create_stemmer(); 
+    }
+
     std::string stem(const char* p, int k) {
 	if (k >= 1024) return std::string(); // Skip this term
 
