@@ -298,12 +298,10 @@ int main(int argc, char** argv) {
 		int f_y = unigram[y].size();
 
 		if (x != y && f_xy >= minSupport) {
-		    float g = std::log(f_x) + std::log(f_y) - std::log(f_xy);
-		//--------------------------------------------------
-		//     float g = f_x * log(f_x) + f_y * log(f_y) - f_xy * log(f_xy);
-		//     if (f_x > f_xy) g -= (f_x - f_xy) * log(f_x - f_xy);
-		//     if (f_y > f_xy) g -= (f_y - f_xy) * log(f_y - f_xy);
-		//-------------------------------------------------- 
+		    // float g = std::log(f_x) + std::log(f_y) - std::log(f_xy);
+		    float g = f_x * log(f_x) + f_y * log(f_y) - f_xy * log(f_xy);
+		    if (f_x > f_xy) g -= (f_x - f_xy) * log(f_x - f_xy);
+		    if (f_y > f_xy) g -= (f_y - f_xy) * log(f_y - f_xy);
 
 		    score.push_back(BigramScore(iter->first, g));
 		}
