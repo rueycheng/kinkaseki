@@ -2,11 +2,11 @@
 #define KINKASEKI_STOPLIST_H
 
 #include <iosfwd>
-#include <set>
 
 namespace kinkaseki {
 
-template<typename Tp, typename Container = std::set<Tp> >
+template<typename Tp, 
+    typename Container = unordered_set<Tp> > // FIXME
 class StopList_Impl {
 protected:
     Container map;
