@@ -361,12 +361,20 @@ extern int stem(struct stemmer * z, char * b, int k)
 
 //--------------------------------------------------
 // PorterStemmer
+//
+// - A `bypassable' version
 //-------------------------------------------------- 
 class PorterStemmer {
+    bool bypass;
     struct stemmer* ps;
 
 public:
-    PorterStemmer() { 
+    PorterStemmer(bool bypass = false): bypass(bypass) { 
+	ps = create_stemmer(); 
+    }
+
+    // NOTE: This is so important
+    PorterStemmer(const PorterStemmer& o): bypass(o.bypass) { 
 	ps = create_stemmer(); 
     }
 
@@ -374,12 +382,8 @@ public:
 	free_stemmer(ps); 
     }
 
-    // NOTE: This is so important
-    PorterStemmer(const PorterStemmer&) { 
-	ps = create_stemmer(); 
-    }
-
     std::string stem(const char* p, int k) {
+	if (bypass) return std::string(p, k + 1);
 	if (k >= 1024) return std::string(); // Skip this term
 
 	char buf[1024];
@@ -392,6 +396,8 @@ public:
     }
 
     std::string stem(const std::string& s) {
+	if (bypass) return s; 
+
 	return stem(s.c_str(), s.size() - 1);
     }
 };

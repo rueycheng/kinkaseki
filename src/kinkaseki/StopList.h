@@ -6,33 +6,35 @@
 
 namespace kinkaseki {
 
-class StopList {
-public:
-    typedef std::string value_type;
-    typedef std::set<std::string> container_type;
-
+template<typename Tp, typename Container = std::set<Tp> >
+class StopList_Impl {
 protected:
-    container_type map;
+    Container map;
 
 public:
-    StopList() {}
+    StopList_Impl() {}
 
-    template<typename Tp>
-    StopList(Tp a[]) {
-	int size = sizeof(a) / sizeof(Tp);
-	StopList(a, a + size);
+    StopList_Impl(const typename Tp::value_type* array[], int n) {
+	insert(&array[0], &array[n]);
     }
 
     template<typename Iterator> 
-    StopList(Iterator first, Iterator last) {
+    StopList_Impl(Iterator first, Iterator last) {
+	insert(first, last);
+    }
+
+    template<typename Iterator>
+    void insert(Iterator first, Iterator last) {
 	while (first != last) map.insert(*first++);
     }
 
-    bool has(const value_type& v) {
-	container_type::iterator iter = map.find(v);
+    bool match(const Tp& v) {
+	typename Container::iterator iter = map.find(v);
 	return iter != map.end();
     }
 };
+
+typedef StopList_Impl<std::string> StopList; 
 
 }
 #endif
