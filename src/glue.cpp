@@ -10,138 +10,8 @@
 #include <algorithm>
 #include <ext/functional>
 
-//--------------------------------------------------
-// Home-made priority queue
-//-------------------------------------------------- 
-using std::vector;
-using std::less;
-
-template<typename _Tp, typename _Sequence = vector<_Tp>, 
-    typename _Map = unordered_map<_Tp, typename _Sequence::distance_type>,
-    typename _Compare = less<typename _Sequence::value_type> >
-class PriorityQueue {
-public:
-    typedef typename _Sequence::value_type value_type;
-    typedef typename _Sequence::reference reference;
-    typedef typename _Sequence::const_reference const_reference;
-    typedef typename _Sequence::size_type size_type;
-    typedef _Sequence container_type;
-
-protected:
-    _Sequence c;
-    _Map m;
-    _Compare comp;
-
-    typedef typename _Sequence::iterator _Iterator;
-    typedef typename _Sequence::difference_type _Distance;
-    typedef typename _Sequence::value_type _Value;
-
-    void __push_heap(_Iterator __first, _Distance __holeIndex,
-		     _Distance __topIndex, _Tp __value)
-    {
-	_Distance __parent = (__holeIndex - 1) / 2;
-	while (__holeIndex > __topIndex
-	       && __comp(*(__first + __parent), __value)) {
-	    *(__first + __holeIndex) = *(__first + __parent);
-	    __holeIndex = __parent;
-	    __parent = (__holeIndex - 1) / 2;
-	}
-
-	*(__first + __holeIndex) = __value;
-    }
-
-    void push_heap(_Iterator __first, _Iterator __last)
-    {
-	_Value __value = *(__last - 1);
-	__push_heap(__first, _Distance((__last - __first) - 1),
-		    _Distance(0), __value);
-    }
-
-    void __pop_heap(_Iterator __first, _Iterator __last, _Iterator __result)
-    {
-	_Value __value = *__result;
-	*__result = *__first;
-	__adjust_heap(__first, _Distance(0), _Distance(__last - __first), __value);
-    }
-
-    void pop_heap(_Iterator __first, _Iterator __last)
-    {
-	--__last;
-	__pop_heap(__first, __last, __last);
-    }
-
-
-    void __adjust_heap(_Iterator __first, _Distance __holeIndex,
-		     _Distance __len, _Tp __value)
-    {
-	const _Distance __topIndex = __holeIndex;
-	_Distance __secondChild = __holeIndex;
-	while (__secondChild < (__len - 1) / 2) {
-	    __secondChild = 2 * (__secondChild + 1);
-	    if (comp(*(__first + __secondChild),
-		     *(__first + (__secondChild - 1))))
-		__secondChild--;
-	    *(__first + __holeIndex) = *(__first + __secondChild);
-	    __holeIndex = __secondChild;
-	}
-
-	if ((__len & 1) == 0 && __secondChild == (__len - 2) / 2) {
-	    __secondChild = 2 * (__secondChild + 1);
-	    *(__first + __holeIndex) = *(__first + __secondChild - 1);
-	    __holeIndex = __secondChild - 1;
-	}
-
-	__push_heap(__first, __holeIndex, __topIndex, __value);
-    }
-
-    void make_heap(_Iterator __first, _Iterator __last)
-    {
-	if (__last - __first < 2) return;
-
-	const _Distance __len = __last - __first;
-	_Distance __parent = (__len - 2) / 2;
-	while (true) {
-	    _Value __value = *(__first + __parent);
-	    __adjust_heap(__first, __parent, __len, __value);
-	    if (__parent == 0) return;
-	    __parent--;
-	}
-    }
-
-public:
-    explicit PriorityQueue(const _Compare& __comp = _Compare(),
-			   const _Sequence& __s = _Sequence(),
-			   const _Map& __m = _Map())
-    : c(__s), m(__m), comp(__comp) 
-    { 
-	make_heap(c.begin(), c.end(), comp); 
-    }
-
-    template<typename _InputIterator> 
-    PriorityQueue(_InputIterator __first, _InputIterator __last,
-		  const _Compare& __comp = _Compare(), 
-		  const _Sequence& __s = _Sequence(),
-		  const _Map& __m = _Map()) 
-    : c(__s), m(__m), comp(__comp) 
-    {
-	c.insert(c.end(), __first, __last);
-	make_heap(c.begin(), c.end(), comp);
-    }
-
-    bool empty() const { return c.empty(); }
-    size_type size() const { return c.size(); }
-    const_reference top() const { return c.front(); }
-
-    void push(const value_type& __x) {
-	c.push_back(__x);
-	push_heap(c.begin(), c.end(), comp);
-    }
-
-    void pop() {
-	pop_heap(c.begin(), c.end(), comp);
-	c.pop_back();
-    }
-};
+#include "kinkaseki/Lexicon.h"
+#include "kinkaseki/LineReader.h"
 
 //--------------------------------------------------
 // Helper functions
@@ -179,9 +49,8 @@ Choose2nd<Pair, Predicate> choose2nd(Predicate pred) {
 //-------------------------------------------------- 
 int main(int argc, char** argv) {
     using namespace std;
-    using kinkaseki::CLI;
 
-    CLI cli(argc, argv);
+    kinkaseki::CLI cli(argc, argv);
 
     int numIteration = 100000;
     int topK = 5;
@@ -199,70 +68,55 @@ int main(int argc, char** argv) {
 
     vector<string> args = cli.parse();
 
-    // Main program starts here
-    //
     // Step 1: Read input and store them as a token stream
-    //         Note the ``special tokens''
-    vector<unsigned int> text;
-    unordered_map<string, unsigned int> lexicon;
-    vector<string> inv_lexicon;
+    kinkaseki::Lexicon lexicon;
+    const int UNK = lexicon.encode("");
+    const int EOL = lexicon.encode("\n");
 
-    lexicon["<>"] = 0; // means 'empty'
-    inv_lexicon.push_back("<>");
-    lexicon["<eol>"] = 1; // mean 'end-of-line'
-    inv_lexicon.push_back("<eol>");
+    vector<int> text;
+    text.push_back(EOL); // The first token is an <eol>
 
-    text.push_back(1); // The first token is an <eol>
-
-    string line;
-    while (getline(cin, line)) {
-	istringstream sin(line);
+    kinkaseki::LineReader reader;
+    while (istream& line = reader.getline(cin)) {
 	string token;
-	unsigned int tokenID;
-
-	while (sin >> token) {
-	    // FIXME: Optimize this line
-	    if (lexicon.find(token) == lexicon.end()) {
-		lexicon.insert(make_pair(token, tokenID = inv_lexicon.size()));
-		inv_lexicon.push_back(token);
-	    }
-	    else
-		tokenID = lexicon[token];
-
-	    text.push_back(tokenID);
-	}
-
-	text.push_back(1); // Of course there is an <eol>
+	while (line >> token) 
+	    text.push_back(lexicon.encode(token));
+	text.push_back(EOL);
     }
 
     // Step 2: Create posting lists
     //
     // We assume the size of the text stream fits into a 4-byte integer.
     // From now on, we'll call each token as a 'Unigram'.
-    typedef unsigned int Unigram;
-    typedef pair<unsigned int, unsigned int> Bigram;
+    typedef int Unigram;
+    typedef pair<int, int> Bigram;
     typedef vector<unsigned int> PostingList;
 
     // NOTE: We keep track of the positions for each unigram (and thus we know
     // the frequencies).  For bigram, we only save the counts.
     typedef vector<PostingList> UnigramIndex;
-    typedef unordered_map<Bigram, unsigned int, boost::hash<Bigram> > BigramIndex;
+    typedef unordered_map<Bigram, int, boost::hash<Bigram> > BigramIndex;
 
-    UnigramIndex unigram(lexicon.size());
+    UnigramIndex unigram;
+    unigram.reserve(lexicon.size());
+
     BigramIndex bigram(lexicon.size());
 
     {
-	vector<unsigned int>::iterator first = text.begin(), last = text.end();
-	vector<unsigned int>::iterator iter = first;
+	typedef vector<Unigram>::iterator iterator;
 
-	Unigram prev = 1, curr;
+	// Note the range: [begin, end - 1)
+	iterator first = text.begin(), last = text.end() - 1;
+	iterator iter = first + 1;
+
+	Unigram prev = *first;
+	if (prev != EOL) unigram[prev].push_back(0);
 
 	while (iter != last) {
-	    curr = *iter;
-
-	    if (curr != 1) {
+	    Unigram curr = *iter;
+	    if (curr != EOL) {
 		unigram[curr].push_back(distance(first, iter));
-		if (prev != 1) bigram[Bigram(prev, curr)]++;
+		if (prev != EOL) bigram[Bigram(prev, curr)]++;
 	    }
 
 	    prev = curr;
@@ -270,7 +124,9 @@ int main(int argc, char** argv) {
 	}
     }
 
-    // FIXME: Don't wanna run forever
+    // FIXME: Calculate the entropy and the rest
+
+    // Now, enter the loop
     int iteration = 0;
     while (++iteration <= numIteration) {
 
@@ -285,7 +141,6 @@ int main(int argc, char** argv) {
 	vector<BigramScore> topBigram;
 
 	{
-	    using std::log;
 	    vector<BigramScore> score;
 	    score.reserve(bigram.size());
 
@@ -298,6 +153,7 @@ int main(int argc, char** argv) {
 		int f_y = unigram[y].size();
 
 		if (x != y && f_xy >= minSupport) {
+		    using std::log;
 		    // float g = std::log(f_x) + std::log(f_y) - std::log(f_xy);
 		    float g = f_x * log(f_x) + f_y * log(f_y) - f_xy * log(f_xy);
 		    if (f_x > f_xy) g -= (f_x - f_xy) * log(f_x - f_xy);
@@ -329,12 +185,12 @@ int main(int argc, char** argv) {
 	unsigned int maxPos = text.size();
 
 	foreach (const BigramScore& bs, topBigram) {
-	    unsigned int x = bs.first.first;
-	    unsigned int y = bs.first.second;
+	    int x = bs.first.first;
+	    int y = bs.first.second;
 	    float score = bs.second;
 
 	    if (cli["verbose"]) 
-		cerr << inv_lexicon[x] << inv_lexicon[y] << ' ' 
+		cerr << lexicon.decode(x) << lexicon.decode(y) << ' ' 
 		//--------------------------------------------------
 		// << bigram[Bigram(x, y)] << ' ' 
 		// << unigram[x].size() << ' '
@@ -352,7 +208,7 @@ int main(int argc, char** argv) {
 	    while (xiter != xlast && yiter != ylast) {
 		if (*xiter < *yiter) {
 		    unsigned int nextPos = *xiter + 1;
-		    while (nextPos < maxPos && text[nextPos] == 0) ++nextPos;
+		    while (nextPos < maxPos && text[nextPos] == UNK) ++nextPos;
 
 		    if (nextPos == *yiter) {
 			pl_xy.push_back(*xiter);
@@ -381,11 +237,11 @@ int main(int argc, char** argv) {
 	    // i.e., the decrement list
 	    foreach (unsigned int pos, pl_xy) {
 		unsigned int prevPos = pos - 1, nextPos = pos + 1;
-		while (prevPos >= 0 && text[prevPos] == 0) --prevPos;
-		while (nextPos < maxPos && text[nextPos] == 0) ++nextPos;
+		while (prevPos >= 0 && text[prevPos] == UNK) --prevPos;
+		while (nextPos < maxPos && text[nextPos] == UNK) ++nextPos;
 
 		unsigned int nextPos2 = nextPos + 1;
-		while (nextPos2 < maxPos && text[nextPos2] == 0) ++nextPos2;
+		while (nextPos2 < maxPos && text[nextPos2] == UNK) ++nextPos2;
 
 		if (prevPos >= 0 && text[prevPos] != 1) 
 		    decrement.insert(prevPos); // do ``ax'' if a exists
@@ -398,7 +254,7 @@ int main(int argc, char** argv) {
 
 	    foreach (unsigned int pos, decrement) {
 		unsigned int nextPos = pos;
-		while (text[++nextPos] == 0) ; // just being slack
+		while (text[++nextPos] == UNK) ; // just being slack
 
 		Bigram b(text[pos], text[nextPos]);
 		update.insert(b);
@@ -408,19 +264,18 @@ int main(int argc, char** argv) {
 	    // (4) Rewrite ``xy'' as ``z0'' (0 as the padding symbol)
 	    
 	    // FIXME: Check if this is consistent to the lexicon
-	    unsigned int z = inv_lexicon.size();
-	    inv_lexicon.push_back(inv_lexicon[x] + inv_lexicon[y]);
+	    int z = lexicon.encode(lexicon.decode(x) + lexicon.decode(y));
 
 	    foreach (unsigned int pos, pl_xy) {
 		unsigned int nextPos = pos;
-		while (text[++nextPos] == 0) ; // being slack again
+		while (text[++nextPos] == UNK) ; // being slack again
 
 		text[pos] = z;
-		text[nextPos] = 0;
+		text[nextPos] = UNK;
 
 		unsigned int prevPos = pos - 1, nextPos2 = nextPos + 1;
-		while (prevPos >= 0 && text[prevPos] == 0) --prevPos;
-		while (nextPos2 < maxPos && text[nextPos2] == 0) ++nextPos2;
+		while (prevPos >= 0 && text[prevPos] == UNK) --prevPos;
+		while (nextPos2 < maxPos && text[nextPos2] == UNK) ++nextPos2;
 
 		if (prevPos >= 0 && text[prevPos] != 1) 
 		    increment.insert(prevPos); // do ``az'' if a exists
@@ -431,7 +286,7 @@ int main(int argc, char** argv) {
 
 	    foreach (unsigned int pos, increment) {
 		unsigned int nextPos = pos;
-		while (text[++nextPos] == 0) ; // just being slack here
+		while (text[++nextPos] == UNK) ; // just being slack here
 
 		Bigram b(text[pos], text[nextPos]);
 		update.insert(b);
@@ -448,12 +303,7 @@ int main(int argc, char** argv) {
 
     // Step 6: Output
     foreach (Unigram u, text) {
-	if (u == 0) 
-	    continue;
-	else if (u == 1)
-	    cout << "\n";
-	else
-	    cout << inv_lexicon[u] << ' ';
+	cout << lexicon.decode(u) << ' ';
     }
 
     return 0;
