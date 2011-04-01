@@ -28,13 +28,15 @@ public:
 
     template<typename InputIterator, typename Token>
     bool operator()(InputIterator& next, InputIterator end, Token& tok) {
+	using boost::tokenizer_detail::get_iterator_category;
+	using boost::tokenizer_detail::assign_or_plus_equal;
 
-	typedef boost::tokenizer_detail::assign_or_plus_equal<
-	    typename boost::tokenizer_detail::get_iterator_category<
-	    InputIterator>::iterator_category
-	    > assigner;
+	typedef get_iterator_category<InputIterator> getter;
+	typedef assign_or_plus_equal<
+	    typename getter::iterator_category> assigner;
 
-	while (next != end && (isspace(*next) || ispunct(*next))) ++next;
+	// while (next != end && (isspace(*next) || ispunct(*next))) ++next;
+	while (next != end && isspace(*next)) ++next;
 	if (next == end) return false;
 
 	short size; 
@@ -44,7 +46,7 @@ public:
 	InputIterator start = next;
 	assigner::clear(tok); // NOTE: HACK!
 
-	if (size == 1) {
+	if (size == 1 && !ispunct(*start)) {
 	    do {
 		++next;
 	    } while (codesize(next, end) == 1 && !isspace(*next) && !ispunct(*next));
