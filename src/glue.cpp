@@ -52,12 +52,14 @@ int main(int argc, char** argv) {
 
     kinkaseki::CLI cli(argc, argv);
 
-    int numIteration = 100000;
-    int topK = 5;
+    float beta = 0.0;
+    int numIteration = 10000;
+    int topK = 1;
     int minSupport = 3;
 
     cli
 	.bind("verbose", "Show verbose output")
+	.bind(beta, "beta", "Specify parameter 'beta'")
 	.bind(numIteration, "iteration,i", "Specify the number of iteration")
 	.bind(topK, "top,t", "Process the top K bigrams per iteration")
 	.bind(minSupport, "support,s", "Specify the minimum support")
@@ -69,11 +71,17 @@ int main(int argc, char** argv) {
     vector<string> args = cli.parse();
 
     // Step 1: Read input and store them as a token stream
-    kinkaseki::Lexicon lexicon;
-    const int UNK = lexicon.encode("");
-    const int EOL = lexicon.encode("\n");
+    //
+    // We assume the size of the text stream fits into a 4-byte integer.
+    // From now on, we'll call each token as a 'Unigram'.
+    typedef int Unigram;
+    typedef pair<int, int> Bigram;
 
-    vector<int> text;
+    kinkaseki::Lexicon lexicon;
+    const Unigram UNK = lexicon.encode("");
+    const Unigram EOL = lexicon.encode("\n");
+
+    vector<Unigram> text;
     text.push_back(EOL); // The first token is an <eol>
 
     kinkaseki::LineReader reader;
@@ -86,20 +94,14 @@ int main(int argc, char** argv) {
 
     // Step 2: Create posting lists
     //
-    // We assume the size of the text stream fits into a 4-byte integer.
-    // From now on, we'll call each token as a 'Unigram'.
-    typedef int Unigram;
-    typedef pair<int, int> Bigram;
-    typedef vector<unsigned int> PostingList;
-
     // NOTE: We keep track of the positions for each unigram (and thus we know
     // the frequencies).  For bigram, we only save the counts.
+    typedef vector<unsigned int> PostingList;
     typedef vector<PostingList> UnigramIndex;
     typedef unordered_map<Bigram, int, boost::hash<Bigram> > BigramIndex;
 
-    UnigramIndex unigram;
-    unigram.reserve(lexicon.size());
-
+    // Set up 
+    UnigramIndex unigram(lexicon.size(), PostingList());
     BigramIndex bigram(lexicon.size());
 
     {
@@ -124,14 +126,38 @@ int main(int argc, char** argv) {
 	}
     }
 
-    // FIXME: Calculate the entropy and the rest
-
     // Now, enter the loop
     int iteration = 0;
     while (++iteration <= numIteration) {
-
-	if (iteration % 1000 == 0)
+	if (iteration % 100 == 0)
 	    cerr << "Iteration " << iteration << "\n";
+
+	// N denotes the total number of `regular' tokens
+	// H denotes H(W), J denotes J(W)
+	//
+	// NOTE: W stands for current support (more details later)
+	unsigned int N = 0;
+	float H = 0.0, J = 0.0;
+
+	{
+	    typedef vector<PostingList>::iterator iterator;
+
+	    iterator iter = unigram.begin(), last = unigram.end();
+	    while (iter != last) {
+		int size = iter->size();
+		if (size > 0) {
+		    J += size * std::log(size);
+		    N += size;
+		}
+
+		++iter;
+	    }
+
+	    H = std::log(N) - J / N;
+
+	    // Show the current entropy
+	    cerr << "N " << N << " J " << J << " H " << H << "\n";
+	}
 
 	// Step 3: Populate the top-k bigrams
 	//
@@ -144,9 +170,13 @@ int main(int argc, char** argv) {
 	    vector<BigramScore> score;
 	    score.reserve(bigram.size());
 
+	    float log_N = std::log(N);
+	    float average_J = J / N;
+
 	    BigramIndex::iterator iter = bigram.begin(), last = bigram.end();
 	    while (iter != last) { 
-		Unigram x = iter->first.first, y = iter->first.second;
+		Unigram x = iter->first.first;
+		Unigram y = iter->first.second;
 
 		int f_xy = iter->second;
 		int f_x = unigram[x].size();
@@ -154,30 +184,51 @@ int main(int argc, char** argv) {
 
 		if (x != y && f_xy >= minSupport) {
 		    using std::log;
-		    // float g = std::log(f_x) + std::log(f_y) - std::log(f_xy);
-		    float g = f_x * log(f_x) + f_y * log(f_y) - f_xy * log(f_xy);
-		    if (f_x > f_xy) g -= (f_x - f_xy) * log(f_x - f_xy);
-		    if (f_y > f_xy) g -= (f_y - f_xy) * log(f_y - f_xy);
 
-		    score.push_back(BigramScore(iter->first, g));
+		    // float g = std::log(f_x) + std::log(f_y) - std::log(f_xy);
+		    float delta_J = 
+			- f_x * log(f_x) 
+			- f_y * log(f_y) 
+			+ f_xy * log(f_xy);
+		    if (f_x > f_xy) 
+			delta_J += (f_x - f_xy) * log(f_x - f_xy);
+		    if (f_y > f_xy) 
+			delta_J += (f_y - f_xy) * log(f_y - f_xy);
+
+		    float delta_H = 
+			log(N - f_xy) 
+			- log_N 
+			- average_J * f_xy / (N - f_xy) 
+			- delta_J / (N - f_xy);
+
+		    float objective = - f_xy * beta + delta_H;
+
+		    score.push_back(BigramScore(iter->first, objective));
 		}
 
 		++iter;
 	    }
 
-	    partial_sort(
-		score.begin(), 
-		score.begin() + topK, 
-		score.end(), 
-		choose2nd<BigramScore>(std::less<float>())
-	    );
+	    if (score.size() > topK) {
+		partial_sort(
+		    score.begin(), 
+		    score.begin() + topK, 
+		    score.end(), 
+		    choose2nd<BigramScore>(std::less<float>())
+		);
 
-	    copy(
-		score.begin(), 
-		score.begin() + topK, 
-		back_inserter(topBigram)
-	    );
+		copy(
+		    score.begin(), 
+		    score.begin() + topK, 
+		    back_inserter(topBigram)
+		);
+	    }
+	    else {
+		copy(score.begin(), score.end(), back_inserter(topBigram));
+	    }
 	}
+
+	if (topBigram.empty()) break;
 
 	// Step 4: Scan-Rewrite procedure
 	//
@@ -190,13 +241,9 @@ int main(int argc, char** argv) {
 	    float score = bs.second;
 
 	    if (cli["verbose"]) 
-		cerr << lexicon.decode(x) << lexicon.decode(y) << ' ' 
-		//--------------------------------------------------
-		// << bigram[Bigram(x, y)] << ' ' 
-		// << unigram[x].size() << ' '
-		// << unigram[y].size() << ' '
-		//-------------------------------------------------- 
-		<< score << "\n";
+		cerr << iteration << ' '
+		    << lexicon.decode(x) << lexicon.decode(y) << ' ' 
+		    << score << "\n";
 
 	    // (1) Prepare the posting lists for x, y, and xy
 	    PostingList::iterator 
@@ -303,7 +350,12 @@ int main(int argc, char** argv) {
 
     // Step 6: Output
     foreach (Unigram u, text) {
-	cout << lexicon.decode(u) << ' ';
+	if (u == UNK) continue;
+
+	if (u == EOL) 
+	    cout << "\n";
+	else
+	    cout << lexicon.decode(u) << ' ';
     }
 
     return 0;
