@@ -3,6 +3,7 @@
 #include <iterator>
 #include <string>
 
+#include "boost/algorithm/string.hpp"
 #include "kinkaseki/CLI.h"
 
 int main(int argc, char** argv) {
@@ -11,6 +12,8 @@ int main(int argc, char** argv) {
     kinkaseki::CLI cli(argc, argv);
 
     cli
+	.bind("ignore-case,i", "Ignore case distinctions")
+	.bind("verbose,v", "Show verbose output")
 	.setUsage("TRUTH-FILE TEST-FILE")
 	.setSynopsis("Evaluate the precision/recall of the segmented text\n")
 	.setTexts(
@@ -36,6 +39,11 @@ int main(int argc, char** argv) {
 	unsigned int lineno = 0;
 	while (getline(truth, l0) && getline(test, l1)) {
 	    ++lineno;
+
+	    if (cli["ignore-case"]) {
+		boost::to_lower(l0);
+		boost::to_lower(l1);
+	    }
 
 	    vector<int> b0, b1;
 	    unsigned int pos = 0;
@@ -70,8 +78,16 @@ int main(int argc, char** argv) {
 		    break;
 	    }
 
+	    while (iter0 != l0.end() && isspace(*iter0)) ++iter0;
+	    while (iter1 != l1.end() && isspace(*iter1)) ++iter1;
+
 	    if (iter0 != l0.end() || iter1 != l1.end()) {
 		cerr << "Content mismatched at line " << lineno << "\n";
+
+		if (cli["verbose"]) {
+		    cerr << "  " << l0 << "\n";
+		    cerr << "  " << l1 << "\n";
+		}
 		continue;
 	    }
 
