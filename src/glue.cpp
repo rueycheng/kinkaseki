@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
     int minSupport = 3;
 
     cli
-	.bind("verbose", "Show verbose output")
+	.bind("verbose,v", "Show verbose output")
 	.bind(beta, "beta", "Specify parameter 'beta'")
 	.bind(numIteration, "iteration,i", "Specify the number of iteration")
 	.bind(topK, "top,t", "Process the top K bigrams per iteration")
@@ -82,8 +82,8 @@ int main(int argc, char** argv) {
     const Unigram EOL = lexicon.encode("\n");
 
     vector<Unigram> text;
-
     kinkaseki::LineReader reader;
+
     while (istream& line = reader.getline(cin)) {
 	string token;
 	while (line >> token) 
@@ -181,26 +181,44 @@ int main(int argc, char** argv) {
 		int f_x = unigram[x].size();
 		int f_y = unigram[y].size();
 
-		if (x != y && f_xy >= minSupport) {
+		if (f_xy >= minSupport) {
 		    using std::log;
+		    float objective;
 
-		    // float g = std::log(f_x) + std::log(f_y) - std::log(f_xy);
-		    float delta_J = 
-			- f_x * log(f_x) 
-			- f_y * log(f_y) 
-			+ f_xy * log(f_xy);
-		    if (f_x > f_xy) 
-			delta_J += (f_x - f_xy) * log(f_x - f_xy);
-		    if (f_y > f_xy) 
-			delta_J += (f_y - f_xy) * log(f_y - f_xy);
+		    if (x != y) {
+			float delta_J = 
+			    - f_x * log(f_x) 
+			    - f_y * log(f_y) 
+			    + f_xy * log(f_xy);
+			if (f_x > f_xy) 
+			    delta_J += (f_x - f_xy) * log(f_x - f_xy);
+			if (f_y > f_xy) 
+			    delta_J += (f_y - f_xy) * log(f_y - f_xy);
 
-		    float delta_H = 
-			log(N - f_xy) 
-			- log_N 
-			- average_J * f_xy / (N - f_xy) 
-			- delta_J / (N - f_xy);
+			float delta_H = 
+			    log(N - f_xy) 
+			    - log_N 
+			    - average_J * f_xy / (N - f_xy) 
+			    - delta_J / (N - f_xy);
 
-		    float objective = - beta * f_xy / N + delta_H;
+			objective = - beta * f_xy / N + delta_H;
+		    }
+		    else {
+			// FIXME: Could be inaccurate
+			float delta_J = 
+			    - f_x * log(f_x) 
+			    + f_xy * log(f_xy);
+			if (f_x > 2 * f_xy) 
+			    delta_J += (f_x - 2 * f_xy) * log(f_x - 2 * f_xy);
+
+			float delta_H = 
+			    log(N - f_xy) 
+			    - log_N 
+			    - average_J * f_xy / (N - f_xy) 
+			    - delta_J / (N - f_xy);
+
+			objective = - beta * f_xy / N + delta_H;
+		    }
 
 		    score.push_back(BigramScore(iter->first, objective));
 		}
@@ -208,7 +226,7 @@ int main(int argc, char** argv) {
 		++iter;
 	    }
 
-	    if (score.size() > topK) {
+	    if (score.size() > static_cast<unsigned int>(topK)) {
 		partial_sort(
 		    score.begin(), 
 		    score.begin() + topK, 
@@ -242,37 +260,76 @@ int main(int argc, char** argv) {
 	    if (cli["verbose"]) 
 		cerr << iteration << ' '
 		    << lexicon.decode(x) << lexicon.decode(y) << ' ' 
+		    << unigram[x].size() << ' '
+		    << unigram[y].size() << ' '
+		    << bigram[bs.first] << ' '
 		    << score << "\n";
 
-	    // (1) Prepare the posting lists for x, y, and xy
-	    PostingList::iterator 
-		xiter = unigram[x].begin(), xlast = unigram[x].end();
-	    PostingList::iterator 
-		yiter = unigram[y].begin(), ylast = unigram[y].end();
-	    PostingList pl_x, pl_y, pl_xy;
+	    // (1) Prepare and renew the posting lists for x, y, and xy (i.e., z)
+	    int z = lexicon.encode(lexicon.decode(x) + lexicon.decode(y));
+	    unigram.push_back(PostingList()); // Now unigram[z] exists
 
-	    while (xiter != xlast && yiter != ylast) {
-		if (*xiter < *yiter) {
+	    if (x != y) {
+		PostingList pl_x, pl_y, pl_xy;
+
+		PostingList::iterator 
+		    xiter = unigram[x].begin(), xlast = unigram[x].end();
+		PostingList::iterator 
+		    yiter = unigram[y].begin(), ylast = unigram[y].end();
+
+		while (xiter != xlast && yiter != ylast) {
+		    if (*xiter < *yiter) {
+			unsigned int nextPos = *xiter + 1;
+			while (nextPos < maxPos && text[nextPos] == UNK) ++nextPos;
+
+			if (nextPos == *yiter) {
+			    pl_xy.push_back(*xiter);
+			    ++xiter;
+			    ++yiter;
+			}
+			else
+			    pl_x.push_back(*xiter++);
+		    }
+		    else
+			pl_y.push_back(*yiter++);
+		}
+
+		if (xiter != xlast)
+		    pl_x.insert(pl_x.end(), xiter, xlast); // oops
+
+		if (yiter != ylast)
+		    pl_y.insert(pl_y.end(), yiter, ylast); // oops
+
+		unigram[x] = pl_x;
+		unigram[y] = pl_y;
+		unigram[z] = pl_xy;
+	    }
+	    else {
+		PostingList pl_x, pl_xx;
+
+		// FIXME: Assert that unigram[x] contains at least one elements
+		PostingList::iterator 
+		    xiter = unigram[x].begin(), xlast = unigram[x].end();
+
+		while (xiter != xlast - 1) { // NOTE: [begin, last - 1)
 		    unsigned int nextPos = *xiter + 1;
 		    while (nextPos < maxPos && text[nextPos] == UNK) ++nextPos;
 
-		    if (nextPos == *yiter) {
-			pl_xy.push_back(*xiter);
-			++xiter;
-			++yiter;
+		    if (*(xiter + 1) == nextPos) {
+			pl_xx.push_back(*xiter);
+			xiter += 2;
+
+			if (xiter == xlast) break;
 		    }
 		    else
 			pl_x.push_back(*xiter++);
 		}
-		else
-		    pl_y.push_back(*yiter++);
+
+		pl_x.insert(pl_x.end(), xiter, xlast); // Always keep the last ones
+
+		unigram[x] = pl_x;
+		unigram[z] = pl_xx;
 	    }
-
-	    if (xiter != xlast)
-		pl_x.insert(pl_x.end(), xiter, xlast); // oops
-
-	    if (yiter != ylast)
-		pl_y.insert(pl_y.end(), yiter, ylast); // oops
 
 	    // (2) Prepare the update, the decrement, and the increment lists
 	    unordered_set<Bigram, boost::hash<Bigram> > update;
@@ -281,7 +338,7 @@ int main(int argc, char** argv) {
 
 	    // (3) Mark immediate neighbors of ``xy'' and correct the counts
 	    // i.e., the decrement list
-	    foreach (unsigned int pos, pl_xy) {
+	    foreach (unsigned int pos, unigram[z]) {
 		int prevPos = pos - 1; 
 		unsigned int nextPos = pos + 1;
 		while (prevPos >= 0 && text[prevPos] == UNK) --prevPos;
@@ -290,12 +347,12 @@ int main(int argc, char** argv) {
 		unsigned int nextPos2 = nextPos + 1;
 		while (nextPos2 < maxPos && text[nextPos2] == UNK) ++nextPos2;
 
-		if (prevPos >= 0 && text[prevPos] != 1) 
+		if (prevPos >= 0 && text[prevPos] != EOL) 
 		    decrement.insert(prevPos); // do ``ax'' if a exists
 
 		decrement.insert(pos); // always do ``xy''
 
-		if (nextPos2 < maxPos && text[nextPos2] != 1) 
+		if (nextPos2 < maxPos && text[nextPos2] != EOL) 
 		    decrement.insert(nextPos); // do ``yb'' if b exists
 	    }
 
@@ -310,10 +367,7 @@ int main(int argc, char** argv) {
 
 	    // (4) Rewrite ``xy'' as ``z0'' (0 as the padding symbol)
 	    
-	    // FIXME: Check if this is consistent to the lexicon
-	    int z = lexicon.encode(lexicon.decode(x) + lexicon.decode(y));
-
-	    foreach (unsigned int pos, pl_xy) {
+	    foreach (unsigned int pos, unigram[z]) {
 		unsigned int nextPos = pos;
 		while (text[++nextPos] == UNK) ; // being slack again
 
@@ -340,12 +394,6 @@ int main(int argc, char** argv) {
 		update.insert(b);
 		bigram[b]++;
 	    }
-
-	    // (5) Renew the posting lists
-	    unigram.push_back(PostingList());
-	    unigram[x] = pl_x;
-	    unigram[y] = pl_y;
-	    unigram[z] = pl_xy;
 	}
     }
 
