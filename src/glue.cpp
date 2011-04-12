@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
 
     kinkaseki::CLI cli(argc, argv);
 
-    float beta = 0.0;
+    float beta = 1.0;
     int numIteration = 10000;
     int topK = 1;
     int minSupport = 3;
@@ -82,7 +82,6 @@ int main(int argc, char** argv) {
     const Unigram EOL = lexicon.encode("\n");
 
     vector<Unigram> text;
-    text.push_back(EOL); // The first token is an <eol>
 
     kinkaseki::LineReader reader;
     while (istream& line = reader.getline(cin)) {
@@ -201,7 +200,7 @@ int main(int argc, char** argv) {
 			- average_J * f_xy / (N - f_xy) 
 			- delta_J / (N - f_xy);
 
-		    float objective = - f_xy * beta + delta_H;
+		    float objective = - beta * f_xy / N + delta_H;
 
 		    score.push_back(BigramScore(iter->first, objective));
 		}
@@ -283,7 +282,8 @@ int main(int argc, char** argv) {
 	    // (3) Mark immediate neighbors of ``xy'' and correct the counts
 	    // i.e., the decrement list
 	    foreach (unsigned int pos, pl_xy) {
-		unsigned int prevPos = pos - 1, nextPos = pos + 1;
+		int prevPos = pos - 1; 
+		unsigned int nextPos = pos + 1;
 		while (prevPos >= 0 && text[prevPos] == UNK) --prevPos;
 		while (nextPos < maxPos && text[nextPos] == UNK) ++nextPos;
 
@@ -320,7 +320,8 @@ int main(int argc, char** argv) {
 		text[pos] = z;
 		text[nextPos] = UNK;
 
-		unsigned int prevPos = pos - 1, nextPos2 = nextPos + 1;
+		int prevPos = pos - 1; 
+		unsigned int nextPos2 = nextPos + 1;
 		while (prevPos >= 0 && text[prevPos] == UNK) --prevPos;
 		while (nextPos2 < maxPos && text[nextPos2] == UNK) ++nextPos2;
 

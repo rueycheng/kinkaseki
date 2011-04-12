@@ -1,4 +1,4 @@
-bin_PROGRAMS = tokenize collect compile kmeans blm glue
+bin_PROGRAMS = tokenize collect compile kmeans blm glue evaluate_segmentation
 
 tokenize_SOURCES = tokenize.cpp compat.h magicbox.h 
 collect_SOURCES = collect.cpp compat.h magicbox.h
@@ -6,6 +6,8 @@ compile_SOURCES = compile.cpp compat.h magicbox.h
 kmeans_SOURCES = kmeans.cpp compat.h magicbox.h
 blm_SOURCES = blm.cpp compat.h magicbox.h
 glue_SOURCES = glue.cpp compat.h kinkaseki/CLI.h
+
+evaluate_segmentation_SOURCES = evaluate_segmentation.cpp kinkaseki/CLI.h
 
 #--------------------------------------------------
 # gii_parse_SOURCES = gii_parse.cpp magicbox.h expatpp.h expatpp_callback.h gii_parse.h
