@@ -5,9 +5,9 @@
 
 #define foreach BOOST_FOREACH
 
+#include "compat.h"
 #include <iterator>
 #include <boost/functional/hash.hpp>
-#include <unordered_map>
 #include <algorithm>
 
 template<typename UnigramMap, typename BigramMap>
