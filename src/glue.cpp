@@ -184,8 +184,13 @@ int main(int argc, char** argv) {
 
     CLI cli(argc, argv);
 
+    unsigned int numIteration = 100000;
+    unsigned int topK = 5;
+
     cli
 	.bind("verbose", "Show verbose output")
+	.bind(numIteration, "iteration,i", "Specify the number of iteration")
+	.bind(topK, "top,t", "Process the top K bigrams per iteration")
 	.setSynopsis("Segment input texts using the glue algorithm\n")
 	.setTexts(
 	    "  No concrete example so far.\n"
@@ -265,39 +270,57 @@ int main(int argc, char** argv) {
     }
 
     // FIXME: Don't wanna run forever
-    while (true) {
+    unsigned int iteration = 0;
+    while (++iteration <= numIteration) {
+
+	if (iteration % 1000 == 0)
+	    cerr << "Iteration " << iteration << "\n";
+
 	// Step 3: Populate the top-k bigrams
 	//
 	// More detail later
 	typedef pair<Bigram, float> BigramScore;
 
-	vector<Bigram> topBigram(10);
+	vector<BigramScore> topBigram;
 
 	{
-	    vector<BigramScore> score(bigram.size());
+	    using std::log;
+	    vector<BigramScore> score;
+	    score.reserve(bigram.size());
 
 	    BigramIndex::iterator iter = bigram.begin(), last = bigram.end();
 	    while (iter != last) { 
-		int f_x = unigram[iter->first.first].size();
-		int f_y = unigram[iter->first.second].size();
-		int f_xy = iter->second;
-		float g = std::log(f_x - f_xy) + std::log(f_y - f_xy) - std::log(f_xy);
+		Unigram x = iter->first.first, y = iter->first.second;
 
-		score.push_back(BigramScore(iter->first, g));
+		int f_xy = iter->second;
+		int f_x = unigram[x].size();
+		int f_y = unigram[y].size();
+
+		if (x != y && f_xy > 0) {
+		    float g = std::log(f_x) + std::log(f_y) - std::log(f_xy);
+		//--------------------------------------------------
+		//     float g = f_x * log(f_x) + f_y * log(f_y) - f_xy * log(f_xy);
+		//     if (f_x > f_xy) g -= (f_x - f_xy) * log(f_x - f_xy);
+		//     if (f_y > f_xy) g -= (f_y - f_xy) * log(f_y - f_xy);
+		//-------------------------------------------------- 
+
+		    score.push_back(BigramScore(iter->first, g));
+		}
+
+		++iter;
 	    }
 
 	    partial_sort(
 		score.begin(), 
-		score.begin() + 10, 
+		score.begin() + topK, 
 		score.end(), 
-		choose2nd<BigramScore>(std::greater<float>())
+		choose2nd<BigramScore>(std::less<float>())
 	    );
 
-	    transform(
+	    copy(
 		score.begin(), 
-		score.begin() + 10, 
-		back_inserter(topBigram),
-		__gnu_cxx::select1st<BigramScore>()
+		score.begin() + topK, 
+		back_inserter(topBigram)
 	    );
 	}
 
@@ -306,11 +329,19 @@ int main(int argc, char** argv) {
 	// More detail later
 	unsigned int maxPos = text.size();
 
-	foreach (const Bigram& b, topBigram) {
-	    unsigned int x = b.first;
-	    unsigned int y = b.second;
+	foreach (const BigramScore& bs, topBigram) {
+	    unsigned int x = bs.first.first;
+	    unsigned int y = bs.first.second;
+	    float score = bs.second;
 
-	    cout << "Process " << inv_lexicon[x] << ' ' << inv_lexicon[y] << "\n";
+	    if (cli["verbose"]) 
+		cerr << inv_lexicon[x] << inv_lexicon[y] << ' ' 
+		//--------------------------------------------------
+		// << bigram[Bigram(x, y)] << ' ' 
+		// << unigram[x].size() << ' '
+		// << unigram[y].size() << ' '
+		//-------------------------------------------------- 
+		<< score << "\n";
 
 	    // (1) Prepare the posting lists for x, y, and xy
 	    PostingList::iterator 
@@ -335,6 +366,12 @@ int main(int argc, char** argv) {
 		else
 		    pl_y.push_back(*yiter++);
 	    }
+
+	    if (xiter != xlast)
+		pl_x.insert(pl_x.end(), xiter, xlast); // oops
+
+	    if (yiter != ylast)
+		pl_y.insert(pl_y.end(), yiter, ylast); // oops
 
 	    // (2) Prepare the update, the decrement, and the increment lists
 	    unordered_set<Bigram, boost::hash<Bigram> > update;
@@ -408,6 +445,16 @@ int main(int argc, char** argv) {
 	    unigram[y] = pl_y;
 	    unigram[z] = pl_xy;
 	}
+    }
+
+    // Step 6: Output
+    foreach (Unigram u, text) {
+	if (u == 0) 
+	    continue;
+	else if (u == 1)
+	    cout << "\n";
+	else
+	    cout << inv_lexicon[u] << ' ';
     }
 
     return 0;
