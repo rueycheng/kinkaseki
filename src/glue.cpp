@@ -184,13 +184,15 @@ int main(int argc, char** argv) {
 
     CLI cli(argc, argv);
 
-    unsigned int numIteration = 100000;
-    unsigned int topK = 5;
+    int numIteration = 100000;
+    int topK = 5;
+    int minSupport = 3;
 
     cli
 	.bind("verbose", "Show verbose output")
 	.bind(numIteration, "iteration,i", "Specify the number of iteration")
 	.bind(topK, "top,t", "Process the top K bigrams per iteration")
+	.bind(minSupport, "support,s", "Specify the minimum support")
 	.setSynopsis("Segment input texts using the glue algorithm\n")
 	.setTexts(
 	    "  No concrete example so far.\n"
@@ -270,7 +272,7 @@ int main(int argc, char** argv) {
     }
 
     // FIXME: Don't wanna run forever
-    unsigned int iteration = 0;
+    int iteration = 0;
     while (++iteration <= numIteration) {
 
 	if (iteration % 1000 == 0)
@@ -296,7 +298,7 @@ int main(int argc, char** argv) {
 		int f_x = unigram[x].size();
 		int f_y = unigram[y].size();
 
-		if (x != y && f_xy > 0) {
+		if (x != y && f_xy >= minSupport) {
 		    float g = std::log(f_x) + std::log(f_y) - std::log(f_xy);
 		//--------------------------------------------------
 		//     float g = f_x * log(f_x) + f_y * log(f_y) - f_xy * log(f_xy);
