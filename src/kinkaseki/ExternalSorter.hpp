@@ -6,6 +6,8 @@
 
 #include "kinkaseki/ExternalMerger.hpp"
 
+namespace kinkaseki {
+
 // ------------------------------------------------------------
 /// @brief ExternalSorter
 ///
@@ -48,5 +50,7 @@ public:
 	return merger.merge();
     }
 };
+
+}
 
 #endif

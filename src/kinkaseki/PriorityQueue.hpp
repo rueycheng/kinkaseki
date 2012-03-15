@@ -1,19 +1,17 @@
-#ifndef KINKASEKI_PRIORITYQUEUE_H
-#define KINKASEKI_PRIORITYQUEUE_H
+#ifndef KINKASEKI_PRIORITY_QUEUE_H
+#define KINKASEKI_PRIORITY_QUEUE_H
 
 #include <vector>
+#include <unordered_map>
 
 namespace kinkaseki {
 
 //--------------------------------------------------
 // Home-made priority queue
 //-------------------------------------------------- 
-using std::vector;
-using std::less;
-
-template<typename _Tp, typename _Sequence = vector<_Tp>, 
-    typename _Map = unordered_map<_Tp, typename _Sequence::distance_type>,
-    typename _Compare = less<typename _Sequence::value_type> >
+template<typename _Tp, typename _Sequence = std::vector<_Tp>, 
+    typename _Map = std::unordered_map<_Tp, typename _Sequence::distance_type>,
+    typename _Compare = std::less<typename _Sequence::value_type> >
 class PriorityQueue {
 public:
     typedef typename _Sequence::value_type value_type;

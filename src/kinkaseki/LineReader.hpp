@@ -1,5 +1,5 @@
-#ifndef KINKASEKI_LINEREADER_H
-#define KINKASEKI_LINEREADER_H
+#ifndef KINKASEKI_LINE_READER_H
+#define KINKASEKI_LINE_READER_H
 
 #include <iosfwd>
 
