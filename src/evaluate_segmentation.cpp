@@ -4,7 +4,7 @@
 #include <string>
 
 #include "boost/algorithm/string.hpp"
-#include "kinkaseki/CLI.h"
+#include "kinkaseki/CLI.hpp"
 
 int main(int argc, char** argv) {
     using namespace std;
