@@ -1,5 +1,5 @@
-#ifndef KINKASEKI_CJKVSEPARATOR_H
-#define KINKASEKI_CJKVSEPARATOR_H
+#ifndef KINKASEKI_CJKV_SEPARATOR_H
+#define KINKASEKI_CJKV_SEPARATOR_H
 
 #include <boost/tokenizer.hpp>
 #include <boost/token_functions.hpp>

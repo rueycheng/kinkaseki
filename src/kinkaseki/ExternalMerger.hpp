@@ -9,6 +9,8 @@
 #include <vector>
 #include <boost/lexical_cast.hpp>
 
+namespace kinkaseki {
+
 // ------------------------------------------------------------
 /// @brief ExternalMerger
 ///
@@ -100,5 +102,7 @@ public:
 	return Result(file);
     }
 };
+
+}
 
 #endif

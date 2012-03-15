@@ -1,5 +1,5 @@
-#ifndef KINKASEKI_STOPLIST_H
-#define KINKASEKI_STOPLIST_H
+#ifndef KINKASEKI_STOP_LIST_H
+#define KINKASEKI_STOP_LIST_H
 
 #include <iosfwd>
 #include <unordered_set>

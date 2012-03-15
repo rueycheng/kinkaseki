@@ -2,13 +2,15 @@
 #define KINKASEKI_LEXICON_H
 
 #include <iosfwd>
+#include <string>
 #include <vector>
+#include <unordered_map>
 
 namespace kinkaseki {
 
 template<typename Tp, 
     typename Integer = int,
-    typename Container = unordered_map<Tp, Integer>, // FIXME
+    typename Container = std::unordered_map<Tp, Integer>, // FIXME
     typename Sequence = std::vector<Tp> >
 class Lexicon_Impl {
 protected:
