@@ -1,48 +1,14 @@
+#include <algorithm>
 #include <iostream>
+#include <iterator>
 #include <boost/foreach.hpp>
-#include "kinkaseki/CLI.h"
-
-#define foreach BOOST_FOREACH
+#include <boost/functional/hash.hpp>
 
 #include "compat.h"
-#include <iterator>
-#include <boost/functional/hash.hpp>
-#include <algorithm>
-#include <ext/functional>
-
-#include "kinkaseki/Lexicon.h"
-#include "kinkaseki/LineReader.h"
-
-//--------------------------------------------------
-// Helper functions
-//-------------------------------------------------- 
-template<typename Pair, typename Predicate>
-struct Choose1st {
-    Predicate pred;
-
-    bool operator()(const Pair& x, const Pair& y) {
-	return pred(x.first, y.first);
-    }
-};
-
-template<typename Pair, typename Predicate>
-Choose1st<Pair, Predicate> choose1st(Predicate pred) {
-    return Choose1st<Pair, Predicate>();
-}
-
-template<typename Pair, typename Predicate>
-struct Choose2nd {
-    Predicate pred;
-
-    bool operator()(const Pair& x, const Pair& y) {
-	return pred(x.second, y.second);
-    }
-};
-
-template<typename Pair, typename Predicate>
-Choose2nd<Pair, Predicate> choose2nd(Predicate pred) {
-    return Choose2nd<Pair, Predicate>();
-}
+#include "kinkaseki/functors.hpp"
+#include "kinkaseki/CLI.hpp"
+#include "kinkaseki/Lexicon.hpp"
+#include "kinkaseki/LineReader.hpp"
 
 //--------------------------------------------------
 // Main program goes here
@@ -227,18 +193,10 @@ int main(int argc, char** argv) {
 	    }
 
 	    if (score.size() > static_cast<unsigned int>(topK)) {
-		partial_sort(
-		    score.begin(), 
-		    score.begin() + topK, 
-		    score.end(), 
-		    choose2nd<BigramScore>(std::less<float>())
-		);
+		partial_sort(score.begin(), score.begin() + topK, 
+			     score.end(), kinkaseki::choose2nd<BigramScore>(std::less<float>()));
 
-		copy(
-		    score.begin(), 
-		    score.begin() + topK, 
-		    back_inserter(topBigram)
-		);
+		copy(score.begin(), score.begin() + topK, back_inserter(topBigram));
 	    }
 	    else {
 		copy(score.begin(), score.end(), back_inserter(topBigram));
@@ -252,7 +210,7 @@ int main(int argc, char** argv) {
 	// More detail later
 	unsigned int maxPos = text.size();
 
-	foreach (const BigramScore& bs, topBigram) {
+	BOOST_FOREACH (const BigramScore& bs, topBigram) {
 	    int x = bs.first.first;
 	    int y = bs.first.second;
 	    float score = bs.second;
@@ -338,7 +296,7 @@ int main(int argc, char** argv) {
 
 	    // (3) Mark immediate neighbors of ``xy'' and correct the counts
 	    // i.e., the decrement list
-	    foreach (unsigned int pos, unigram[z]) {
+	    BOOST_FOREACH (unsigned int pos, unigram[z]) {
 		int prevPos = pos - 1; 
 		unsigned int nextPos = pos + 1;
 		while (prevPos >= 0 && text[prevPos] == UNK) --prevPos;
@@ -356,7 +314,7 @@ int main(int argc, char** argv) {
 		    decrement.insert(nextPos); // do ``yb'' if b exists
 	    }
 
-	    foreach (unsigned int pos, decrement) {
+	    BOOST_FOREACH (unsigned int pos, decrement) {
 		unsigned int nextPos = pos;
 		while (text[++nextPos] == UNK) ; // just being slack
 
@@ -367,7 +325,7 @@ int main(int argc, char** argv) {
 
 	    // (4) Rewrite ``xy'' as ``z0'' (0 as the padding symbol)
 	    
-	    foreach (unsigned int pos, unigram[z]) {
+	    BOOST_FOREACH (unsigned int pos, unigram[z]) {
 		unsigned int nextPos = pos;
 		while (text[++nextPos] == UNK) ; // being slack again
 
@@ -386,7 +344,7 @@ int main(int argc, char** argv) {
 		    increment.insert(pos); // do ``zb'' if b exists
 	    }
 
-	    foreach (unsigned int pos, increment) {
+	    BOOST_FOREACH (unsigned int pos, increment) {
 		unsigned int nextPos = pos;
 		while (text[++nextPos] == UNK) ; // just being slack here
 
@@ -398,7 +356,7 @@ int main(int argc, char** argv) {
     }
 
     // Step 6: Output
-    foreach (Unigram u, text) {
+    BOOST_FOREACH (Unigram u, text) {
 	if (u == UNK) continue;
 
 	if (u == EOL) 

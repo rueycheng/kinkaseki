@@ -1,17 +1,12 @@
 #include <iostream>
 #include <string>
-
 #include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 
-#include "compat.h"
-#include "kinkaseki/CLI.h"
-#include "kinkaseki/PorterStemmer.h"
-#include "kinkaseki/CJKVSeparator.h"
-#include "kinkaseki/StopList.h"
-
-using namespace std;
+#include "kinkaseki/CLI.hpp"
+#include "kinkaseki/PorterStemmer.hpp"
+#include "kinkaseki/CJKVSeparator.hpp"
+#include "kinkaseki/StopList.hpp"
 
 template<typename Separator, typename StopList, typename Stemmer>
 class Pipeline {
@@ -25,13 +20,13 @@ public:
 	     Stemmer stemmer = Stemmer())
 	:separator(separator), stoplist(stoplist), stemmer(stemmer) {}
 
-    void run(istream& in, ostream& out) {
-	string line;
+    void run(std::istream& in, std::ostream& out) {
+	std::string line;
 
 	while (getline(in, line)) {
 	    boost::to_lower(line);
 	    boost::tokenizer<Separator> tok(line, separator);
-	    foreach (const string& t, tok) { 
+	    BOOST_FOREACH (const std::string& t, tok) { 
 		if (stoplist.match(t)) continue;
 		out << stemmer.stem(t) << ' ';
 	    }
@@ -50,6 +45,7 @@ pipeline(Separator separator, StopList stoplist, Stemmer stemmer) {
 // Main program
 //-------------------------------------------------- 
 int main(int argc, char** argv) {
+    using namespace std;
 
     kinkaseki::CLI cli(argc, argv);
 
@@ -69,25 +65,26 @@ int main(int argc, char** argv) {
     }
 
     // Stopword list
-    const char* stopwords[] = { "a", "able", "about", "across", "after", "all",
-	"almost", "also", "am", "among", "an", "and", "any", "are", "as", "at",
-	"be", "because", "been", "but", "by", "can", "cannot", "could", "dear",
-	"did", "do", "does", "either", "else", "ever", "every", "for", "from",
-	"get", "got", "had", "has", "have", "he", "her", "hers", "him", "his",
-	"how", "however", "i", "if", "in", "into", "is", "it", "its", "just",
-	"least", "let", "like", "likely", "may", "me", "might", "most", "must",
-	"my", "neither", "no", "nor", "not", "of", "off", "often", "on",
-	"only", "or", "other", "our", "own", "rather", "said", "say", "says",
-	"she", "should", "since", "so", "some", "than", "that", "the", "their",
+    const char* stopwords[] = { 
+	"a", "able", "about", "across", "after", "all", "almost", "also", "am",
+	"among", "an", "and", "any", "are", "as", "at", "be", "because",
+	"been", "but", "by", "can", "cannot", "could", "dear", "did", "do",
+	"does", "either", "else", "ever", "every", "for", "from", "get", "got",
+	"had", "has", "have", "he", "her", "hers", "him", "his", "how",
+	"however", "i", "if", "in", "into", "is", "it", "its", "just", "least",
+	"let", "like", "likely", "may", "me", "might", "most", "must", "my",
+	"neither", "no", "nor", "not", "of", "off", "often", "on", "only",
+	"or", "other", "our", "own", "rather", "said", "say", "says", "she",
+	"should", "since", "so", "some", "than", "that", "the", "their",
 	"them", "then", "there", "these", "they", "this", "tis", "to", "too",
 	"twas", "us", "wants", "was", "we", "were", "what", "when", "where",
 	"which", "while", "who", "whom", "why", "will", "with", "would", "yet",
-	"you", "your" };
+	"you", "your" 
+    };
 
-    kinkaseki::StopList stoplist(
-	stopwords, 
-	cli["no-stoplist"]? 0: sizeof(stopwords) / sizeof(const char*)
-    );
+    kinkaseki::StopList stoplist(stopwords, 
+				 cli["no-stoplist"]? 0: 
+				 sizeof(stopwords) / sizeof(const char*));
 
     kinkaseki::PorterStemmer stemmer(cli["no-stemmer"]);
 
