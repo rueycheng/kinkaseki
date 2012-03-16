@@ -33,9 +33,9 @@ NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
 bin_PROGRAMS = tokenize$(EXEEXT) glue$(EXEEXT) \
-	evaluate_segmentation$(EXEEXT)
+	evaluate_segmentation$(EXEEXT) ubt$(EXEEXT)
 subdir = src
-DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in compile
+DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/acinclude.m4 \
 	$(top_srcdir)/configure.in
@@ -56,6 +56,9 @@ glue_LDADD = $(LDADD)
 am_tokenize_OBJECTS = tokenize.$(OBJEXT)
 tokenize_OBJECTS = $(am_tokenize_OBJECTS)
 tokenize_LDADD = $(LDADD)
+am_ubt_OBJECTS = ubt.$(OBJEXT)
+ubt_OBJECTS = $(am_ubt_OBJECTS)
+ubt_LDADD = $(LDADD)
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -70,9 +73,9 @@ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 SOURCES = $(evaluate_segmentation_SOURCES) $(glue_SOURCES) \
-	$(tokenize_SOURCES)
+	$(tokenize_SOURCES) $(ubt_SOURCES)
 DIST_SOURCES = $(evaluate_segmentation_SOURCES) $(glue_SOURCES) \
-	$(tokenize_SOURCES)
+	$(tokenize_SOURCES) $(ubt_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -169,6 +172,7 @@ top_srcdir = @top_srcdir@
 tokenize_SOURCES = tokenize.cpp 
 glue_SOURCES = glue.cpp compat.h 
 evaluate_segmentation_SOURCES = evaluate_segmentation.cpp 
+ubt_SOURCES = ubt.cpp compat.h
 
 #--------------------------------------------------
 # blm_SOURCES = blm.cpp compat.h magicbox.h
@@ -259,6 +263,9 @@ glue$(EXEEXT): $(glue_OBJECTS) $(glue_DEPENDENCIES)
 tokenize$(EXEEXT): $(tokenize_OBJECTS) $(tokenize_DEPENDENCIES) 
 	@rm -f tokenize$(EXEEXT)
 	$(CXXLINK) $(tokenize_OBJECTS) $(tokenize_LDADD) $(LIBS)
+ubt$(EXEEXT): $(ubt_OBJECTS) $(ubt_DEPENDENCIES) 
+	@rm -f ubt$(EXEEXT)
+	$(CXXLINK) $(ubt_OBJECTS) $(ubt_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -269,6 +276,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evaluate_segmentation.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/glue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tokenize.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ubt.Po@am__quote@
 
 .cpp.o:
 @am__fastdepCXX_TRUE@	$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
