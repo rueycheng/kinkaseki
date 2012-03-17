@@ -20,15 +20,19 @@ int main(int argc, char** argv) {
 
     float beta = 1.0;
     int numIteration = 10000;
+    double ratio = 0.0;
     int topK = 1;
     int minSupport = 3;
+    int charLimit = 10000;
 
     cli
 	.bind("verbose,v", "Show verbose output")
 	.bind(beta, "beta", "Specify parameter 'beta'")
 	.bind(numIteration, "iteration,i", "Specify the number of iteration")
+	.bind(ratio, "ratio,r", "Specify the expected word/token ratio as the terminal condition")
 	.bind(topK, "top,t", "Process the top K bigrams per iteration")
 	.bind(minSupport, "support,s", "Specify the minimum support")
+	.bind(charLimit, "limit", "Specify the maximum number of characters in a word")
 	.setSynopsis("Segment input texts using the glue algorithm\n")
 	.setTexts(
 	    "  No concrete example so far.\n"
@@ -63,10 +67,12 @@ int main(int argc, char** argv) {
     // the frequencies).  For bigram, we only save the counts.
     typedef vector<unsigned int> PostingList;
     typedef vector<PostingList> UnigramIndex;
+    typedef vector<int> UnigramSizeIndex;
     typedef unordered_map<Bigram, int, boost::hash<Bigram> > BigramIndex;
 
     // Set up 
     UnigramIndex unigram(lexicon.size(), PostingList());
+    UnigramSizeIndex unigramSize(lexicon.size(), 1); // initially 1
     BigramIndex bigram(lexicon.size());
 
     {
@@ -91,12 +97,14 @@ int main(int argc, char** argv) {
 	}
     }
 
+    int numTokens = 0;
+    BOOST_FOREACH (const PostingList& pl, unigram) {
+	numTokens += pl.size();
+    }
+
     // Now, enter the loop
     int iteration = 0;
-    while (++iteration <= numIteration) {
-	if (iteration % 100 == 0)
-	    cerr << "Iteration " << iteration << "\n";
-
+    while (++iteration) {
 	// N denotes the total number of `regular' tokens
 	// H denotes H(W), J denotes J(W)
 	//
@@ -121,8 +129,17 @@ int main(int argc, char** argv) {
 	    H = std::log(N) - J / N;
 
 	    // Show the current entropy
-	    cerr << "N " << N << " J " << J << " H " << H << "\n";
+	    // cerr << "N " << N << " J " << J << " H " << H << "\n";
 	}
+
+	double currentRatio = static_cast<double>(N) / numTokens;
+
+	if (currentRatio < ratio || (ratio <= 0.0 && iteration > numIteration))
+	    break;
+
+	cerr << iteration << " " << currentRatio << "\n";
+	if (iteration % 100 == 0)
+	    cerr << "Iteration " << iteration << "\n";
 
 	// Step 3: Populate the top-k bigrams
 	//
@@ -132,6 +149,8 @@ int main(int argc, char** argv) {
 	vector<BigramScore> topBigram;
 
 	{
+	    using std::log;
+
 	    vector<BigramScore> score;
 	    score.reserve(bigram.size());
 
@@ -139,7 +158,7 @@ int main(int argc, char** argv) {
 	    float average_J = J / N;
 
 	    BigramIndex::iterator iter = bigram.begin(), last = bigram.end();
-	    while (iter != last) { 
+	    for (; iter != last; ++iter) { 
 		Unigram x = iter->first.first;
 		Unigram y = iter->first.second;
 
@@ -147,49 +166,47 @@ int main(int argc, char** argv) {
 		int f_x = unigram[x].size();
 		int f_y = unigram[y].size();
 
-		if (f_xy >= minSupport) {
-		    using std::log;
-		    float objective;
+		if (unigramSize[x] + unigramSize[y] > charLimit) continue;
+		if (f_xy < minSupport) continue;
+		
+		float objective;
 
-		    if (x != y) {
-			float delta_J = 
-			    - f_x * log(f_x) 
-			    - f_y * log(f_y) 
-			    + f_xy * log(f_xy);
-			if (f_x > f_xy) 
-			    delta_J += (f_x - f_xy) * log(f_x - f_xy);
-			if (f_y > f_xy) 
-			    delta_J += (f_y - f_xy) * log(f_y - f_xy);
+		if (x != y) {
+		    float delta_J = 
+			- f_x * log(f_x) 
+			- f_y * log(f_y) 
+			+ f_xy * log(f_xy);
+		    if (f_x > f_xy) 
+			delta_J += (f_x - f_xy) * log(f_x - f_xy);
+		    if (f_y > f_xy) 
+			delta_J += (f_y - f_xy) * log(f_y - f_xy);
 
-			float delta_H = 
-			    log(N - f_xy) 
-			    - log_N 
-			    - average_J * f_xy / (N - f_xy) 
-			    - delta_J / (N - f_xy);
+		    float delta_H = 
+			log(N - f_xy) 
+			- log_N 
+			- average_J * f_xy / (N - f_xy) 
+			- delta_J / (N - f_xy);
 
-			objective = - beta * f_xy / N + delta_H;
-		    }
-		    else {
-			// FIXME: Could be inaccurate
-			float delta_J = 
-			    - f_x * log(f_x) 
-			    + f_xy * log(f_xy);
-			if (f_x > 2 * f_xy) 
-			    delta_J += (f_x - 2 * f_xy) * log(f_x - 2 * f_xy);
+		    objective = - beta * f_xy / N + delta_H;
+		}
+		else {
+		    // FIXME: Could be inaccurate
+		    float delta_J = 
+			- f_x * log(f_x) 
+			+ f_xy * log(f_xy);
+		    if (f_x > 2 * f_xy) 
+			delta_J += (f_x - 2 * f_xy) * log(f_x - 2 * f_xy);
 
-			float delta_H = 
-			    log(N - f_xy) 
-			    - log_N 
-			    - average_J * f_xy / (N - f_xy) 
-			    - delta_J / (N - f_xy);
+		    float delta_H = 
+			log(N - f_xy) 
+			- log_N 
+			- average_J * f_xy / (N - f_xy) 
+			- delta_J / (N - f_xy);
 
-			objective = - beta * f_xy / N + delta_H;
-		    }
-
-		    score.push_back(BigramScore(iter->first, objective));
+		    objective = - beta * f_xy / N + delta_H;
 		}
 
-		++iter;
+		score.push_back(BigramScore(iter->first, objective));
 	    }
 
 	    if (score.size() > static_cast<unsigned int>(topK)) {
@@ -226,6 +243,7 @@ int main(int argc, char** argv) {
 	    // (1) Prepare and renew the posting lists for x, y, and xy (i.e., z)
 	    int z = lexicon.encode(lexicon.decode(x) + lexicon.decode(y));
 	    unigram.push_back(PostingList()); // Now unigram[z] exists
+	    unigramSize.push_back(unigramSize[x] + unigramSize[y]);
 
 	    if (x != y) {
 		PostingList pl_x, pl_y, pl_xy;
