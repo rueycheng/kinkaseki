@@ -1,5 +1,5 @@
-#ifndef KINKASEKI_EXTERNAL_MERGER_H
-#define KINKASEKI_EXTERNAL_MERGER_H
+#ifndef EXTERNAL_MERGER_H
+#define EXTERNAL_MERGER_H
 
 #include <algorithm>
 #include <fstream>
@@ -9,7 +9,7 @@
 #include <vector>
 #include <boost/lexical_cast.hpp>
 
-namespace kinkaseki {
+namespace util {
 
 // ------------------------------------------------------------
 /// @brief ExternalMerger
@@ -20,6 +20,7 @@ namespace kinkaseki {
 template<typename T, typename Less = std::less<T>>
 class ExternalMerger {
 protected:
+    std::string prefix;
     std::vector<std::string> runFiles;
 
 public:
@@ -27,15 +28,16 @@ public:
 	std::string file;
 	std::ifstream* in; 
 	std::istream_iterator<T> iter;
+	bool autoDelete;
 
     public:
-	Result(const std::string& file): 
-	    file(file), in(new std::ifstream(file)) 
+	Result(const std::string& file, bool autoDelete = false): 
+	    file(file), in(new std::ifstream(file)), autoDelete(autoDelete) 
 	{ }
 
 	~Result() {
 	    delete in;
-	    ::unlink(file.c_str());
+	    if (autoDelete) ::unlink(file.c_str());
 	}
 
 	std::istream_iterator<T> iterator() {
@@ -55,12 +57,16 @@ public:
 	}
     };
 
+    ExternalMerger(const std::string& prefix):
+	prefix(prefix) {}
+
     ~ExternalMerger() {
 	for (int i = 0; i < runFiles.size(); ++i) ::unlink(runFiles[i].c_str());
     }
 
     template<typename Iterator> void addRun(Iterator first, Iterator last) {
-	std::string file = "/tmp/ExternalMerger-" + boost::lexical_cast<std::string>(runFiles.size());
+	std::string file = "/tmp/ExternalMerger-" 
+	    + prefix + "-" + boost::lexical_cast<std::string>(runFiles.size());
 	std::ofstream out(file);
 	std::copy(first, last, std::ostream_iterator<T>(out, ""));
 
@@ -68,36 +74,44 @@ public:
     }
 
     void mergeToFile(const std::string& file) {
-	std::ofstream out(file);
-	std::ostream_iterator<T> result(out, "");
+	if (runFiles.size() == 1) {
+	    std::ifstream in(runFiles[0]);
+	    std::ofstream out(file);
 
-	std::vector<std::ifstream*> pool;
-	std::vector<std::istream_iterator<T>> runs;
-
-	for (int i = 0; i < runFiles.size(); ++i) {
-	    pool.push_back(new std::ifstream(runFiles[i]));
-	    runs.push_back(std::istream_iterator<T>(*pool[i]));
+	    out << in.rdbuf();
 	}
+	else {
+	    std::ofstream out(file);
+	    std::ostream_iterator<T> result(out, "");
 
-	Comparator comp;
-	std::istream_iterator<T> endOfRun;
-	std::make_heap(runs.begin(), runs.end(), comp);
-	while (!runs.empty()) {
-	    std::pop_heap(runs.begin(), runs.end(), comp);
-	    std::istream_iterator<T>& current = runs.back();
+	    std::vector<std::ifstream*> pool;
+	    std::vector<std::istream_iterator<T>> runs;
 
-	    *result++ = *current++;
-	    if (current != endOfRun) 
-		std::push_heap(runs.begin(), runs.end(), comp);
-	    else
-		runs.pop_back();
+	    for (int i = 0; i < runFiles.size(); ++i) {
+		pool.push_back(new std::ifstream(runFiles[i]));
+		runs.push_back(std::istream_iterator<T>(*pool[i]));
+	    }
+
+	    Comparator comp;
+	    std::istream_iterator<T> endOfRun;
+	    std::make_heap(runs.begin(), runs.end(), comp);
+	    while (!runs.empty()) {
+		std::pop_heap(runs.begin(), runs.end(), comp);
+		std::istream_iterator<T>& current = runs.back();
+
+		*result++ = *current++;
+		if (current != endOfRun) 
+		    std::push_heap(runs.begin(), runs.end(), comp);
+		else
+		    runs.pop_back();
+	    }
+
+	    for (int i = 0; i < runFiles.size(); ++i) delete pool[i];
 	}
-
-	for (int i = 0; i < runFiles.size(); ++i) delete pool[i];
     }
 
     Result merge() {
-	std::string file = "/tmp/ExternalMerger-result";
+	std::string file = "/tmp/ExternalMerger-" + prefix + "-result";
 	mergeToFile(file);
 	return Result(file);
     }
