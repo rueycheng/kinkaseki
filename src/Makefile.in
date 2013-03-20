@@ -35,7 +35,7 @@ POST_UNINSTALL = :
 bin_PROGRAMS = tokenize$(EXEEXT) glue$(EXEEXT) \
 	evaluate_segmentation$(EXEEXT) ubt$(EXEEXT)
 subdir = src
-DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
+DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in compile
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/acinclude.m4 \
 	$(top_srcdir)/configure.in
