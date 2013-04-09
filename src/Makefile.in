@@ -33,7 +33,7 @@ NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
 bin_PROGRAMS = tokenize$(EXEEXT) glue$(EXEEXT) \
-	evaluate_segmentation$(EXEEXT) ubt$(EXEEXT)
+	evaluate_segmentation$(EXEEXT) ubt$(EXEEXT) lda$(EXEEXT)
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in compile
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -53,6 +53,9 @@ evaluate_segmentation_LDADD = $(LDADD)
 am_glue_OBJECTS = glue.$(OBJEXT)
 glue_OBJECTS = $(am_glue_OBJECTS)
 glue_LDADD = $(LDADD)
+am_lda_OBJECTS = lda.$(OBJEXT)
+lda_OBJECTS = $(am_lda_OBJECTS)
+lda_LDADD = $(LDADD)
 am_tokenize_OBJECTS = tokenize.$(OBJEXT)
 tokenize_OBJECTS = $(am_tokenize_OBJECTS)
 tokenize_LDADD = $(LDADD)
@@ -73,9 +76,9 @@ COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 CCLD = $(CC)
 LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 SOURCES = $(evaluate_segmentation_SOURCES) $(glue_SOURCES) \
-	$(tokenize_SOURCES) $(ubt_SOURCES)
+	$(lda_SOURCES) $(tokenize_SOURCES) $(ubt_SOURCES)
 DIST_SOURCES = $(evaluate_segmentation_SOURCES) $(glue_SOURCES) \
-	$(tokenize_SOURCES) $(ubt_SOURCES)
+	$(lda_SOURCES) $(tokenize_SOURCES) $(ubt_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -173,6 +176,7 @@ tokenize_SOURCES = tokenize.cpp
 glue_SOURCES = glue.cpp compat.h 
 evaluate_segmentation_SOURCES = evaluate_segmentation.cpp 
 ubt_SOURCES = ubt.cpp compat.h
+lda_SOURCES = lda.cpp
 
 #--------------------------------------------------
 # blm_SOURCES = blm.cpp compat.h magicbox.h
@@ -260,6 +264,9 @@ evaluate_segmentation$(EXEEXT): $(evaluate_segmentation_OBJECTS) $(evaluate_segm
 glue$(EXEEXT): $(glue_OBJECTS) $(glue_DEPENDENCIES) 
 	@rm -f glue$(EXEEXT)
 	$(CXXLINK) $(glue_OBJECTS) $(glue_LDADD) $(LIBS)
+lda$(EXEEXT): $(lda_OBJECTS) $(lda_DEPENDENCIES) 
+	@rm -f lda$(EXEEXT)
+	$(CXXLINK) $(lda_OBJECTS) $(lda_LDADD) $(LIBS)
 tokenize$(EXEEXT): $(tokenize_OBJECTS) $(tokenize_DEPENDENCIES) 
 	@rm -f tokenize$(EXEEXT)
 	$(CXXLINK) $(tokenize_OBJECTS) $(tokenize_LDADD) $(LIBS)
@@ -275,6 +282,7 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evaluate_segmentation.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/glue.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lda.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tokenize.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ubt.Po@am__quote@
 

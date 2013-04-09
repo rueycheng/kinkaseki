@@ -10,6 +10,18 @@
 #include "kinkaseki/Lexicon.hpp"
 #include "kinkaseki/LineReader.hpp"
 
+inline float objective1(float beta, int f_xy, int N, int numToken, float delta_H) {
+    return - beta * f_xy / N + delta_H;
+}
+
+inline float objective2(float beta, int f_xy, int N, int numToken, float delta_H) {
+    return - beta * f_xy / numToken + delta_H;
+}
+
+inline float objective3(float beta, int f_xy, int N, int numToken, float delta_H) {
+    return - beta * std::log(f_xy) + delta_H;
+}
+
 //--------------------------------------------------
 // Main program goes here
 //-------------------------------------------------- 
@@ -24,6 +36,8 @@ int main(int argc, char** argv) {
     int topK = 1;
     int minSupport = 3;
     int charLimit = 10000;
+    int subcharLimit = 2;
+    int objectiveType = 1;
 
     cli
 	.bind("verbose,v", "Show verbose output")
@@ -33,6 +47,8 @@ int main(int argc, char** argv) {
 	.bind(topK, "top,t", "Process the top K bigrams per iteration")
 	.bind(minSupport, "support,s", "Specify the minimum support")
 	.bind(charLimit, "limit", "Specify the maximum number of characters in a word")
+	.bind(subcharLimit, "sublimit", "Specify the maximum number of characters in a subword")
+	.bind(objectiveType, "type", "Specify the objective function (1=ratio, 2=freq, 3=logfreq)")
 	.setSynopsis("Segment input texts using the glue algorithm\n")
 	.setTexts(
 	    "  No concrete example so far.\n"
@@ -74,6 +90,15 @@ int main(int argc, char** argv) {
     UnigramIndex unigram(lexicon.size(), PostingList());
     UnigramSizeIndex unigramSize(lexicon.size(), 1); // initially 1
     BigramIndex bigram(lexicon.size());
+
+    float (*objectiveFunction)(float, int, int, int, float);
+
+    if (objectiveType == 1)
+	objectiveFunction = &objective1;
+    else if (objectiveType == 2)
+	objectiveFunction = &objective2;
+    else
+	objectiveFunction = &objective3;
 
     {
 	typedef vector<Unigram>::iterator iterator;
@@ -137,9 +162,11 @@ int main(int argc, char** argv) {
 	if (currentRatio < ratio || (ratio <= 0.0 && iteration > numIteration))
 	    break;
 
-	cerr << iteration << " " << currentRatio << "\n";
+	// if (cli["verbose"])
+	    // cerr << iteration << " " << currentRatio << "\n";
+
 	if (iteration % 100 == 0)
-	    cerr << "Iteration " << iteration << "\n";
+	    cerr << "Iteration " << iteration << " (ratio: " << currentRatio << ")\n";
 
 	// Step 3: Populate the top-k bigrams
 	//
@@ -167,6 +194,11 @@ int main(int argc, char** argv) {
 		int f_y = unigram[y].size();
 
 		if (unigramSize[x] + unigramSize[y] > charLimit) continue;
+
+		int smaller = unigramSize[x] > unigramSize[y]? 
+		    unigramSize[y]: unigramSize[x];
+		if (smaller > subcharLimit) continue;
+
 		if (f_xy < minSupport) continue;
 		
 		float objective;
@@ -187,7 +219,8 @@ int main(int argc, char** argv) {
 			- average_J * f_xy / (N - f_xy) 
 			- delta_J / (N - f_xy);
 
-		    objective = - beta * f_xy / N + delta_H;
+		    // objective = - beta * f_xy / N + delta_H;
+		    objective = objectiveFunction(beta, f_xy, N, numTokens, delta_H);
 		}
 		else {
 		    // FIXME: Could be inaccurate
@@ -203,7 +236,8 @@ int main(int argc, char** argv) {
 			- average_J * f_xy / (N - f_xy) 
 			- delta_J / (N - f_xy);
 
-		    objective = - beta * f_xy / N + delta_H;
+		    // objective = - beta * f_xy / N + delta_H;
+		    objective = objectiveFunction(beta, f_xy, N, numTokens, delta_H);
 		}
 
 		score.push_back(BigramScore(iter->first, objective));
@@ -233,7 +267,9 @@ int main(int argc, char** argv) {
 	    float score = bs.second;
 
 	    if (cli["verbose"]) 
-		cerr << iteration << ' '
+		cerr 
+		    << iteration << ' ' 
+		    << currentRatio << ' '
 		    << lexicon.decode(x) << lexicon.decode(y) << ' ' 
 		    << unigram[x].size() << ' '
 		    << unigram[y].size() << ' '

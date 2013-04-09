@@ -13,6 +13,8 @@ class Pipeline {
     Separator separator;
     StopList stoplist;
     Stemmer stemmer;
+    bool skipFirstInLine;
+    bool doLowercase;
 
 public:
     Pipeline(Separator separator = Separator(), 
@@ -20,10 +22,16 @@ public:
 	     Stemmer stemmer = Stemmer())
 	:separator(separator), stoplist(stoplist), stemmer(stemmer) {}
 
-    void run(std::istream& in, std::ostream& out) {
+    void run(std::istream& in, std::ostream& out, bool skipFirstInLine = false) {
 	std::string line;
 
 	while (getline(in, line)) {
+	    if (skipFirstInLine) {
+		size_t pos = line.find(' ');
+		out << line.substr(0, pos) << ' ';
+		line.erase(0, pos);
+	    }
+
 	    boost::to_lower(line);
 	    boost::tokenizer<Separator> tok(line, separator);
 	    BOOST_FOREACH (const std::string& t, tok) { 
@@ -53,7 +61,8 @@ int main(int argc, char** argv) {
 	.bind("bypass", "Bypass")
 	.bind("no-stoplist", "Do not filter stopwords")
 	.bind("no-stemmer", "Do not employ stemmer")
-	.bind("no-cjkv", "Use the default whitespace separator.")
+	.bind("no-cjkv", "Use the default whitespace separator")
+	.bind("skip-first-in-line", "Skip the first consecutive string in each line")
 	.setSynopsis("Tokenize the input");
 
     cli.parse();
@@ -91,11 +100,11 @@ int main(int argc, char** argv) {
     // FIXME: If-else looks really ugly
     if (cli["no-utf8"]) {
 	boost::char_separator<char> sep;
-	pipeline(sep, stoplist, stemmer).run(cin, cout);
+	pipeline(sep, stoplist, stemmer).run(cin, cout, cli["skip-first-in-line"]);
     }
     else {
 	kinkaseki::CJKVSeparator sep;
-	pipeline(sep, stoplist, stemmer).run(cin, cout);
+	pipeline(sep, stoplist, stemmer).run(cin, cout, cli["skip-first-in-line"]);
     }
 
     return 0;
