@@ -6,13 +6,5 @@ evaluate_segmentation_SOURCES = evaluate_segmentation.cpp
 ubt_SOURCES = ubt.cpp compat.h
 descent_SOURCES = descent.cpp
 
-#--------------------------------------------------
-# blm_SOURCES = blm.cpp compat.h magicbox.h
-# collect_SOURCES = collect.cpp compat.h magicbox.h
-# compile_SOURCES = compile.cpp compat.h magicbox.h
-# kmeans_SOURCES = kmeans.cpp compat.h magicbox.h
-#-------------------------------------------------- 
-
-AM_LDFLAGS = -lboost_program_options-mt -lboost_filesystem-mt
-AM_CXXFLAGS = -Wall -std=c++0x
-INCLUDES = -I@topdir@
+LDADD = -lboost_program_options-mt -lboost_filesystem-mt
+AM_CXXFLAGS = -Wall -std=c++0x -I@topdir@
