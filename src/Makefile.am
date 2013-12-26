@@ -1,10 +1,10 @@
-bin_PROGRAMS = tokenize glue evaluate_segmentation ubt lda
+bin_PROGRAMS = tokenize glue evaluate_segmentation ubt descent
 
 tokenize_SOURCES = tokenize.cpp 
 glue_SOURCES = glue.cpp compat.h 
 evaluate_segmentation_SOURCES = evaluate_segmentation.cpp 
 ubt_SOURCES = ubt.cpp compat.h
-lda_SOURCES = lda.cpp
+descent_SOURCES = descent.cpp
 
 #--------------------------------------------------
 # blm_SOURCES = blm.cpp compat.h magicbox.h
