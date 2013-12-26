@@ -6,6 +6,7 @@ a.out
 blm
 collect
 compile
+descent
 evaluate_segmentation
 glue
 kmeans
