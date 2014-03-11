@@ -10,16 +10,24 @@
 #include "kinkaseki/Lexicon.hpp"
 #include "kinkaseki/LineReader.hpp"
 
-inline float objective1(float beta, int f_xy, int N, int numToken, float delta_H) {
+inline float objective1(float beta, int f_xy, int N, int numToken, float delta_H, int W) {
     return - beta * f_xy / N + delta_H;
 }
 
-inline float objective2(float beta, int f_xy, int N, int numToken, float delta_H) {
+inline float objective2(float beta, int f_xy, int N, int numToken, float delta_H, int W) {
     return - beta * f_xy / numToken + delta_H;
 }
 
-inline float objective3(float beta, int f_xy, int N, int numToken, float delta_H) {
+inline float objective3(float beta, int f_xy, int N, int numToken, float delta_H, int W) {
     return - beta * std::log(f_xy) + delta_H;
+}
+
+inline float objective4(float beta, int f_xy, int N, int numToken, float delta_H, int W) {
+    return - beta * f_xy + delta_H;
+}
+
+inline float objective5(float beta, int f_xy, int N, int numToken, float delta_H, int W) {
+    return f_xy * (delta_H - beta);
 }
 
 //--------------------------------------------------
@@ -38,9 +46,11 @@ int main(int argc, char** argv) {
     int charLimit = 10000;
     int subcharLimit = 2;
     int objectiveType = 1;
+    // string punct = "";
 
     cli
 	.bind("verbose,v", "Show verbose output")
+	.bind("pmi,p", "Use the negative PMI in place of delta H")
 	.bind(beta, "beta", "Specify parameter 'beta'")
 	.bind(numIteration, "iteration,i", "Specify the number of iteration")
 	.bind(ratio, "ratio,r", "Specify the expected word/token ratio as the terminal condition")
@@ -49,6 +59,7 @@ int main(int argc, char** argv) {
 	.bind(charLimit, "limit", "Specify the maximum number of characters in a word")
 	.bind(subcharLimit, "sublimit", "Specify the maximum number of characters in a subword")
 	.bind(objectiveType, "type", "Specify the objective function (1=ratio, 2=freq, 3=logfreq)")
+	// .bind(punct, "punct", "Specify the punctuation marks, separated by whitespace")
 	.setSynopsis("Segment input texts using the glue algorithm\n")
 	.setTexts(
 	    "  No concrete example so far.\n"
@@ -66,6 +77,19 @@ int main(int argc, char** argv) {
     kinkaseki::Lexicon lexicon;
     const Unigram UNK = lexicon.encode("");
     const Unigram EOL = lexicon.encode("\n");
+
+    lexicon.encode("\xef\xbc\x81");
+    lexicon.encode("\xef\xbc\x8c");
+    lexicon.encode("\xef\xbc\x88");
+    lexicon.encode("\xef\xbc\x89");
+    lexicon.encode("\xef\xbc\x9a");
+    lexicon.encode("\xef\xbc\x9f");
+    lexicon.encode("\xef\xb8\xb0");
+    lexicon.encode("\xe3\x80\x81");
+    lexicon.encode("\xe3\x80\x82");
+    lexicon.encode("\xe3\x80\x8c");
+    const Unigram SPECIAL_END = 
+	lexicon.encode("\xe3\x80\x8d"); // Mark the last special token
 
     vector<Unigram> text;
     kinkaseki::LineReader reader;
@@ -91,14 +115,18 @@ int main(int argc, char** argv) {
     UnigramSizeIndex unigramSize(lexicon.size(), 1); // initially 1
     BigramIndex bigram(lexicon.size());
 
-    float (*objectiveFunction)(float, int, int, int, float);
+    float (*objectiveFunction)(float, int, int, int, float, int);
 
     if (objectiveType == 1)
 	objectiveFunction = &objective1;
     else if (objectiveType == 2)
 	objectiveFunction = &objective2;
-    else
+    else if (objectiveType == 3)
 	objectiveFunction = &objective3;
+    else if (objectiveType == 4)
+	objectiveFunction = &objective4;
+    else
+	objectiveFunction = &objective5;
 
     {
 	typedef vector<Unigram>::iterator iterator;
@@ -114,7 +142,8 @@ int main(int argc, char** argv) {
 	    Unigram curr = *iter;
 	    if (curr != EOL) {
 		unigram[curr].push_back(distance(first, iter));
-		if (prev != EOL) bigram[Bigram(prev, curr)]++;
+		if (prev != EOL)
+		    bigram[Bigram(prev, curr)]++;
 	    }
 
 	    prev = curr;
@@ -151,7 +180,7 @@ int main(int argc, char** argv) {
 		++iter;
 	    }
 
-	    H = std::log(N) - J / N;
+	    // H = std::log(N) - J / N;
 
 	    // Show the current entropy
 	    // cerr << "N " << N << " J " << J << " H " << H << "\n";
@@ -189,10 +218,12 @@ int main(int argc, char** argv) {
 		Unigram x = iter->first.first;
 		Unigram y = iter->first.second;
 
-		int f_xy = iter->second;
-		int f_x = unigram[x].size();
-		int f_y = unigram[y].size();
+		int f_xy = iter->second + 1;
+		int f_x = unigram[x].size() + 1;
+		int f_y = unigram[y].size() + 1;
 
+		if (x <= SPECIAL_END) continue;
+		if (y <= SPECIAL_END) continue;
 		if (unigramSize[x] + unigramSize[y] > charLimit) continue;
 
 		int smaller = unigramSize[x] > unigramSize[y]? 
@@ -201,45 +232,40 @@ int main(int argc, char** argv) {
 
 		if (f_xy < minSupport) continue;
 		
-		float objective;
+		float delta_H;
+		
+		if (!cli["pmi"]) {
+		    float delta_J;
 
-		if (x != y) {
-		    float delta_J = 
-			- f_x * log(f_x) 
-			- f_y * log(f_y) 
-			+ f_xy * log(f_xy);
-		    if (f_x > f_xy) 
-			delta_J += (f_x - f_xy) * log(f_x - f_xy);
-		    if (f_y > f_xy) 
-			delta_J += (f_y - f_xy) * log(f_y - f_xy);
+		    if (x != y) {
+			delta_J = 
+			    - f_x * log(f_x) 
+			    - f_y * log(f_y) 
+			    + f_xy * log(f_xy);
+			if (f_x > f_xy) 
+			    delta_J += (f_x - f_xy) * log(f_x - f_xy);
+			if (f_y > f_xy) 
+			    delta_J += (f_y - f_xy) * log(f_y - f_xy);
+		    }
+		    else {
+			// FIXME: Could be inaccurate
+			delta_J = 
+			    - f_x * log(f_x) 
+			    + f_xy * log(f_xy);
+			if (f_x > 2 * f_xy) 
+			    delta_J += (f_x - 2 * f_xy) * log(f_x - 2 * f_xy);
+		    }
 
-		    float delta_H = 
-			log(N - f_xy) 
-			- log_N 
-			- average_J * f_xy / (N - f_xy) 
-			- delta_J / (N - f_xy);
-
-		    // objective = - beta * f_xy / N + delta_H;
-		    objective = objectiveFunction(beta, f_xy, N, numTokens, delta_H);
+		    delta_H = log(N - f_xy) - log_N 
+			- average_J * f_xy / (N - f_xy) - delta_J / (N - f_xy);
 		}
-		else {
-		    // FIXME: Could be inaccurate
-		    float delta_J = 
-			- f_x * log(f_x) 
-			+ f_xy * log(f_xy);
-		    if (f_x > 2 * f_xy) 
-			delta_J += (f_x - 2 * f_xy) * log(f_x - 2 * f_xy);
+		else
+		    // delta_H = log(f_x - f_xy) + log(f_y - f_xy) - log(f_xy) - log_N;
+		    delta_H = log((f_x - f_xy) * (f_y - f_xy) / f_xy) - log_N;
 
-		    float delta_H = 
-			log(N - f_xy) 
-			- log_N 
-			- average_J * f_xy / (N - f_xy) 
-			- delta_J / (N - f_xy);
-
-		    // objective = - beta * f_xy / N + delta_H;
-		    objective = objectiveFunction(beta, f_xy, N, numTokens, delta_H);
-		}
-
+		float objective = objectiveFunction(beta, f_xy, N, numTokens, delta_H, unigram.size());
+		// objective = - beta * (log(f_xy) + log_N - log(f_x) - log(f_y)) + delta_H;
+		    
 		score.push_back(BigramScore(iter->first, objective));
 	    }
 
