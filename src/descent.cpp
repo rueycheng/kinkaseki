@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 #include <iterator>
+#include <boost/format.hpp>
 #include <boost/foreach.hpp>
 #include <boost/functional/hash.hpp>
 
@@ -10,27 +12,30 @@
 #include "kinkaseki/Lexicon.hpp"
 #include "kinkaseki/LineReader.hpp"
 
-//--------------------------------------------------
-// inline float objective1(float beta, int f_xy, int N, int numToken, float delta_H, int W) {
-//     return - beta * f_xy / N + delta_H;
-// }
-// 
-// inline float objective2(float beta, int f_xy, int N, int numToken, float delta_H, int W) {
-//     return - beta * f_xy / numToken + delta_H;
-// }
-// 
-// inline float objective3(float beta, int f_xy, int N, int numToken, float delta_H, int W) {
-//     return - beta * std::log(f_xy) + delta_H;
-// }
-// 
-// inline float objective4(float beta, int f_xy, int N, int numToken, float delta_H, int W) {
-//     return - beta * f_xy + delta_H;
-// }
-// 
-// inline float objective5(float beta, int f_xy, int N, int numToken, float delta_H, int W) {
-//     return f_xy * (delta_H - beta);
-// }
-//-------------------------------------------------- 
+typedef int Unigram;
+typedef std::pair<int, int> Bigram;
+
+void 
+output_segmented_text(std::ostream& out, std::vector<Unigram>& text, 
+		      kinkaseki::Lexicon& lexicon, Unigram unk, Unigram eol)
+{
+    bool newline = true;
+    BOOST_FOREACH (Unigram u, text) {
+	if (u == unk) continue;
+
+	if (u == eol) {
+	    out << "\n";
+	    newline = true;
+	}
+	else {
+	    if (newline)
+		newline = false;
+	    else
+		out << ' ';
+	    out << lexicon.decode(u);
+	}
+    }
+}
 
 //--------------------------------------------------
 // Main program goes here
@@ -46,11 +51,13 @@ int main(int argc, char** argv) {
     int numIteration = 10000;
     double ratio = 0.0;
     int topK = 1;
-    int minSupport = 3;
-    int charLimit = 10000;
-    int subcharLimit = 2;
-    int objectiveType = 1;
+    // int minSupport = 3;
+    // int charLimit = 10000;
+    // int subcharLimit = 2;
+    // int objectiveType = 1;
     // string punct = "";
+    int outputEvery = 100;
+    string outputPath = "";
 
     cli
 	.bind("verbose,v", "Show verbose output")
@@ -60,10 +67,12 @@ int main(int argc, char** argv) {
 	.bind(numIteration, "iteration,i", "Specify the number of iteration")
 	.bind(ratio, "ratio,r", "Specify the expected word/token ratio as the terminal condition")
 	.bind(topK, "top,t", "Process the top K bigrams per iteration")
-	.bind(minSupport, "support,s", "Specify the minimum support")
-	.bind(charLimit, "limit", "Specify the maximum number of characters in a word")
-	.bind(subcharLimit, "sublimit", "Specify the maximum number of characters in a subword")
-	.bind(objectiveType, "type", "Specify the objective function (1=ratio, 2=freq, 3=logfreq)")
+	.bind(outputEvery, "outputEvery", "Output temporary result every N iterations")
+	.bind(outputPath, "outputPath", "Output result to this directory")
+	// .bind(minSupport, "support,s", "Specify the minimum support")
+	// .bind(charLimit, "limit", "Specify the maximum number of characters in a word")
+	// .bind(subcharLimit, "sublimit", "Specify the maximum number of characters in a subword")
+	// .bind(objectiveType, "type", "Specify the objective function (1=ratio, 2=freq, 3=logfreq)")
 	// .bind(punct, "punct", "Specify the punctuation marks, separated by whitespace")
 	.setSynopsis("Segment input texts using the glue algorithm\n")
 	.setTexts(
@@ -76,8 +85,6 @@ int main(int argc, char** argv) {
     //
     // We assume the size of the text stream fits into a 4-byte integer.
     // From now on, we'll call each token as a 'Unigram'.
-    typedef int Unigram;
-    typedef pair<int, int> Bigram;
 
     kinkaseki::Lexicon lexicon;
     const Unigram UNK = lexicon.encode("");
@@ -404,17 +411,28 @@ int main(int argc, char** argv) {
 		bigram[b]++;
 	    }
 	}
+
+	if (iteration % outputEvery == 0) {
+	    string filename = boost::str(boost::format("output.%05d") % iteration);
+
+	    cerr << boost::format("Save output to %s") % filename << '\n';
+	    ofstream fout(filename);
+	    output_segmented_text(fout, text, lexicon, UNK, EOL);
+	}
     }
 
     // Step 6: Output
-    BOOST_FOREACH (Unigram u, text) {
-	if (u == UNK) continue;
-
-	if (u == EOL) 
-	    cout << "\n";
-	else
-	    cout << lexicon.decode(u) << ' ';
-    }
+    output_segmented_text(cout, text, lexicon, UNK, EOL);
+    //--------------------------------------------------
+    // BOOST_FOREACH (Unigram u, text) {
+    // 	if (u == UNK) continue;
+    // 
+    // 	if (u == EOL) 
+    // 	    cout << "\n";
+    // 	else
+    // 	    cout << lexicon.decode(u) << ' ';
+    // }
+    //-------------------------------------------------- 
 
     return 0;
 }
