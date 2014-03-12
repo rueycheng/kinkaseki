@@ -4,6 +4,7 @@
 #include <string>
 
 #include "boost/algorithm/string.hpp"
+#include "boost/format.hpp"
 #include "kinkaseki/CLI.hpp"
 
 int main(int argc, char** argv) {
@@ -14,7 +15,7 @@ int main(int argc, char** argv) {
     cli
 	.bind("ignore-case,i", "Ignore case distinctions")
 	.bind("verbose,v", "Show verbose output")
-	.setUsage("TRUTH-FILE TEST-FILE")
+	.setUsage("TRUTH-FILE TEST-FILE [TEST-FILE..]")
 	.setSynopsis("Evaluate the precision/recall of the segmented text\n")
 	.setTexts(
 	    "  TRUTH-FILE\tThe gold standard segmented text\n"
@@ -28,10 +29,13 @@ int main(int argc, char** argv) {
 	return 0;
     }
 
-    ifstream truth(args[0].c_str());
-    ifstream test(args[1].c_str());
+    string truth_file = args[0];
 
-    {
+    for (size_t i = 1; i < args.size(); ++i) {
+	string test_file = args[i];
+	ifstream truth(truth_file);
+	ifstream test(test_file);
+
 	int word_matched = 0, word_relevant = 0, word_retrieved = 0;
 	int boundary_matched = 0, boundary_relevant = 0, boundary_retrieved = 0;
 
@@ -137,14 +141,9 @@ int main(int argc, char** argv) {
 	float boundary_precision = float(boundary_matched - 2) / boundary_retrieved;
 	float boundary_f = 2 * boundary_recall * boundary_precision / (boundary_recall + boundary_precision);
 
-	cout 
-	    << "P " << word_precision 
-	    << " R " << word_recall 
-	    << " F " << word_f << "\n";
-	cout 
-	    << "BP " << boundary_precision 
-	    << " BR " << boundary_recall 
-	    << " BF " << boundary_f << "\n";
+	cout << boost::format("%s\t[W] %5.2f %5.2f %5.2f [B] %5.2f %5.2f %5.2f") %
+	    test_file % word_precision % word_recall % word_f %
+	    boundary_precision % boundary_recall % boundary_f << '\n';
     }
 
     return 0;
