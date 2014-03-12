@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <iterator>
+#include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/foreach.hpp>
 #include <boost/functional/hash.hpp>
@@ -37,6 +38,15 @@ output_segmented_text(std::ostream& out, std::vector<Unigram>& text,
     }
 }
 
+void die(const std::string& message) {
+    std::cerr << message << '\n';
+    exit(1);
+}
+
+void die(const boost::format& fmt) {
+    die(boost::str(fmt));
+}
+
 //--------------------------------------------------
 // Main program goes here
 //-------------------------------------------------- 
@@ -57,7 +67,8 @@ int main(int argc, char** argv) {
     // int objectiveType = 1;
     // string punct = "";
     int outputEvery = 100;
-    string outputPath = "";
+    string prefix = "output";
+    string outputPath = ".";
 
     cli
 	.bind("verbose,v", "Show verbose output")
@@ -68,7 +79,8 @@ int main(int argc, char** argv) {
 	.bind(ratio, "ratio,r", "Specify the expected word/token ratio as the terminal condition")
 	.bind(topK, "top,t", "Process the top K bigrams per iteration")
 	.bind(outputEvery, "outputEvery", "Output temporary result every N iterations")
-	.bind(outputPath, "outputPath", "Output result to this directory")
+	.bind(prefix, "prefix", "Prefix for the output files")
+	.bind(outputPath, "outputPath,D", "Output result to this directory")
 	// .bind(minSupport, "support,s", "Specify the minimum support")
 	// .bind(charLimit, "limit", "Specify the maximum number of characters in a word")
 	// .bind(subcharLimit, "sublimit", "Specify the maximum number of characters in a subword")
@@ -80,6 +92,9 @@ int main(int argc, char** argv) {
 	);
 
     vector<string> args = cli.parse();
+
+    if (!boost::filesystem::is_directory(outputPath) && !boost::filesystem::create_directory(outputPath))
+	die(boost::format("Cannot create output path: '%s'") % outputPath);
 
     // Step 1: Read input and store them as a token stream
     //
@@ -163,35 +178,19 @@ int main(int argc, char** argv) {
 	//
 	// NOTE: W stands for current support (more details later)
 	unsigned int N = 0;
-	// float H = 0.0, J = 0.0;
 
 	{
 	    typedef vector<PostingList>::iterator iterator;
 
 	    iterator iter = unigram.begin(), last = unigram.end();
-	    while (iter != last) {
-		int size = iter->size();
-		if (size > 0) {
-		    // J += size * std::log(size);
-		    N += size;
-		}
-
-		++iter;
-	    }
-
-	    // H = std::log(N) - J / N;
-
-	    // Show the current entropy
-	    // cerr << "N " << N << " J " << J << " H " << H << "\n";
+	    while (iter != last) 
+		N += iter++->size();
 	}
 
 	double currentRatio = static_cast<double>(N) / numTokens;
 
 	if (currentRatio < ratio || (ratio <= 0.0 && iteration > numIteration))
 	    break;
-
-	// if (cli["verbose"])
-	    // cerr << iteration << " " << currentRatio << "\n";
 
 	if (iteration % 100 == 0)
 	    cerr << "Iteration " << iteration << " (ratio: " << currentRatio << ")\n";
@@ -413,26 +412,26 @@ int main(int argc, char** argv) {
 	}
 
 	if (iteration % outputEvery == 0) {
-	    string filename = boost::str(boost::format("output.%05d") % iteration);
+	    string filename = boost::str(boost::format("%s.%05d") % prefix % iteration);
+	    boost::filesystem::path filepath(outputPath);
+	    filepath /= filename;
 
-	    cerr << boost::format("Save output to %s") % filename << '\n';
-	    ofstream fout(filename);
+	    cerr << boost::format("Save output to %s") % filepath << '\n';
+	    ofstream fout(filepath.c_str());
 	    output_segmented_text(fout, text, lexicon, UNK, EOL);
 	}
     }
 
     // Step 6: Output
-    output_segmented_text(cout, text, lexicon, UNK, EOL);
-    //--------------------------------------------------
-    // BOOST_FOREACH (Unigram u, text) {
-    // 	if (u == UNK) continue;
-    // 
-    // 	if (u == EOL) 
-    // 	    cout << "\n";
-    // 	else
-    // 	    cout << lexicon.decode(u) << ' ';
-    // }
-    //-------------------------------------------------- 
+    {
+	string filename = boost::str(boost::format("%s.final") % prefix);
+	boost::filesystem::path filepath(outputPath);
+	filepath /= filename;
+
+	cerr << boost::format("Save output to %s") % filepath << '\n';
+	ofstream fout(filepath.c_str());
+	output_segmented_text(fout, text, lexicon, UNK, EOL);
+    }
 
     return 0;
 }

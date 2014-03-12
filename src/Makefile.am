@@ -6,5 +6,5 @@ evaluate_segmentation_SOURCES = evaluate_segmentation.cpp
 ubt_SOURCES = ubt.cpp compat.h
 descent_SOURCES = descent.cpp
 
-LDADD = -lboost_program_options -lboost_filesystem
+LDADD = -lboost_program_options -lboost_filesystem -lboost_system
 AM_CXXFLAGS = -Wall -std=c++0x -I@topdir@
