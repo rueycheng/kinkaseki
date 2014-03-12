@@ -15,6 +15,7 @@ int main(int argc, char** argv) {
     cli
 	.bind("ignore-case,i", "Ignore case distinctions")
 	.bind("verbose,v", "Show verbose output")
+	.bind("silent", "Suppress warnings")
 	.setUsage("TRUTH-FILE TEST-FILE [TEST-FILE..]")
 	.setSynopsis("Evaluate the precision/recall of the segmented text\n")
 	.setTexts(
@@ -24,7 +25,7 @@ int main(int argc, char** argv) {
 
     vector<string> args = cli.parse();
 
-    if (args.size() != 2) {
+    if (args.size() < 2) {
 	cli.showHelp();
 	return 0;
     }
@@ -86,11 +87,13 @@ int main(int argc, char** argv) {
 	    while (iter1 != l1.end() && isspace(*iter1)) ++iter1;
 
 	    if (iter0 != l0.end() || iter1 != l1.end()) {
-		cerr << "Content mismatched at line " << lineno << "\n";
+		if (!cli["silent"]) {
+		    cerr << "Content mismatched at line " << lineno << "\n";
 
-		if (cli["verbose"]) {
-		    cerr << "  " << l0 << "\n";
-		    cerr << "  " << l1 << "\n";
+		    if (cli["verbose"]) {
+			cerr << "  " << l0 << "\n";
+			cerr << "  " << l1 << "\n";
+		    }
 		}
 		continue;
 	    }
@@ -137,13 +140,19 @@ int main(int argc, char** argv) {
 	float word_recall = float(word_matched) / word_relevant;
 	float word_precision = float(word_matched) / word_retrieved;
 	float word_f = 2 * word_recall * word_precision / (word_recall + word_precision);
-	float boundary_recall = float(boundary_matched - 2) / boundary_relevant; 
+	float boundary_recall = float(boundary_matched - 2) / boundary_relevant;
 	float boundary_precision = float(boundary_matched - 2) / boundary_retrieved;
 	float boundary_f = 2 * boundary_recall * boundary_precision / (boundary_recall + boundary_precision);
 
-	cout << boost::format("%s\t[W] %5.2f %5.2f %5.2f [B] %5.2f %5.2f %5.2f") %
-	    test_file % word_precision % word_recall % word_f %
-	    boundary_precision % boundary_recall % boundary_f << '\n';
+	cout << boost::format("%s\t[W] %6.2f %6.2f %6.2f [B] %6.2f %6.2f %6.2f") % 
+	    test_file % 
+	    (100 * word_precision) % 
+	    (100 * word_recall) % 
+	    (100 * word_f) %
+	    (100 * boundary_precision) % 
+	    (100 * boundary_recall) % 
+	    (100 * boundary_f) 
+	    << endl;
     }
 
     return 0;
