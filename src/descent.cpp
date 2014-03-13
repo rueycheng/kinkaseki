@@ -170,6 +170,12 @@ int main(int argc, char** argv) {
 	numTokens += pl.size();
     }
 
+    // Precompute xlogx values up to 100
+    vector<double> xlogx;
+    xlogx.push_back(0); // 0 log 0 = 0
+    for (int i = 1; i <= 100; ++i)
+	xlogx.push_back(i * log(i));
+
     // Now, enter the loop
     int iteration = 0;
     while (++iteration) {
@@ -238,10 +244,15 @@ int main(int argc, char** argv) {
 		// float objective = objectiveFunction(beta, f_xy, N, numTokens, delta_H, unigram.size());
 		int unigramSize_xy = unigramSize[x] + unigramSize[y];
 
+		if (unigramSize_xy >= xlogx.size()) 
+		    die("Something's wrong.  The word is way too big");
+
+		float penalty = xlogx[unigramSize_xy] - xlogx[unigramSize[x]] - xlogx[unigramSize[y]];
+
 		float objective = 
-		    f_xy * (1 + log(f_x * f_y / f_xy) - log_N - alpha) + 
-		    beta * f_xy * (unigramSize_xy * log(unigramSize_xy) - 
-				   unigramSize[x] * log(unigramSize[x]) - unigramSize[y] * log(unigramSize[y]));
+		    f_xy * (1 + log(f_x * f_y / f_xy) - log_N - alpha) + beta * f_xy * penalty;
+		    // beta * f_xy * (unigramSize_xy * log(unigramSize_xy) - 
+				   // unigramSize[x] * log(unigramSize[x]) - unigramSize[y] * log(unigramSize[y]));
 		    
 		score.push_back(BigramScore(iter->first, objective));
 	    }
