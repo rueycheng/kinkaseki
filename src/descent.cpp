@@ -6,6 +6,7 @@
 #include <boost/format.hpp>
 #include <boost/foreach.hpp>
 #include <boost/functional/hash.hpp>
+#include <boost/regex.hpp>
 
 #include "compat.h"
 #include "kinkaseki/functors.hpp"
@@ -72,6 +73,7 @@ int main(int argc, char** argv) {
 
     cli
 	.bind("verbose,v", "Show verbose output")
+	.bind("linguisticRule,l", "Prevent merging non-wordlike pairs")
 	.bind(alpha, "alpha,a", "Specify parameter 'alpha'")
 	.bind(beta, "beta,b", "Specify parameter 'beta'")
 	.bind(dir, "dir,d", "Specify parameter 'dir'")
@@ -176,6 +178,13 @@ int main(int argc, char** argv) {
     for (int i = 1; i <= 100; ++i)
 	xlogx.push_back(i * log(i));
 
+    // Set up regular expressions
+    std::string vowel = "[#%&()*3679AEIOQRUaeilou~]";
+    std::string consonant = "[DGLMNSTWZbcdfghklmnprstvwyz]";
+    std::string syllable = consonant + "*" + vowel + "+" + consonant + "*";
+
+    const boost::regex word_pattern("^(" + syllable + "){1,4}$");
+
     // Now, enter the loop
     int iteration = 0;
     while (++iteration) {
@@ -209,12 +218,12 @@ int main(int argc, char** argv) {
 	vector<BigramScore> topBigram;
 
 	{
-	    using std::log;
+	    using std::log2;
 
 	    vector<BigramScore> score;
 	    score.reserve(bigram.size());
 
-	    float log_N = std::log(N);
+	    float log_N = log2(N);
 	    // float average_J = J / N;
 
 	    BigramIndex::iterator iter = bigram.begin(), last = bigram.end();
@@ -230,6 +239,14 @@ int main(int argc, char** argv) {
 
 		if (x <= SPECIAL_END) continue;
 		if (y <= SPECIAL_END) continue;
+
+		if (cli["linguisticRule"]) { 
+		    string word_xy = lexicon.decode(x) + lexicon.decode(y);
+		    if (!boost::regex_match(word_xy, word_pattern)) continue;
+		}
+
+		int W = unigram.size();
+
 		//--------------------------------------------------
 		// if (unigramSize[x] + unigramSize[y] > charLimit) continue;
 		//
@@ -250,7 +267,9 @@ int main(int argc, char** argv) {
 		float penalty = xlogx[unigramSize_xy] - xlogx[unigramSize[x]] - xlogx[unigramSize[y]];
 
 		float objective = 
-		    f_xy * (1 + log(f_x * f_y / f_xy) - log_N - alpha) + beta * f_xy * penalty;
+		    f_xy * (1 + log2(f_x * f_y / f_xy) - log_N - alpha) + 
+		    0.5 * ((W + 1) * log2(N - f_xy) - W * log_N) +
+		    beta * f_xy * penalty;
 		    // beta * f_xy * (unigramSize_xy * log(unigramSize_xy) - 
 				   // unigramSize[x] * log(unigramSize[x]) - unigramSize[y] * log(unigramSize[y]));
 		    
