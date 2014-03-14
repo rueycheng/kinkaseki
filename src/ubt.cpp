@@ -164,7 +164,7 @@ int main(int argc, char** argv) {
 	//
 	// NOTE: W stands for current support (more details later)
 	unsigned int N = 0;
-	float H = 0.0, J = 0.0;
+	float J = 0.0;
 
 	{
 	    typedef vector<PostingList>::iterator iterator;

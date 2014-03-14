@@ -70,7 +70,7 @@ public:
 	std::vector<std::string> passthrough;
 
 	visible.add_options()
-	    ("help", "Show this help screen")
+	    ("help,h", "Show this help screen")
 	    ("version", "Show the version into");
 
 	try {
