@@ -60,6 +60,7 @@ int main(int argc, char** argv) {
     float beta = 1.0;
     float dir = 0.0;
     int numIteration = 10000;
+    double threshold = 0.0;
     double ratio = 0.0;
     int topK = 1;
     // int minSupport = 3;
@@ -77,7 +78,8 @@ int main(int argc, char** argv) {
 	.bind(alpha, "alpha,a", "Specify parameter 'alpha'")
 	.bind(beta, "beta,b", "Specify parameter 'beta'")
 	.bind(dir, "dir,d", "Specify parameter 'dir'")
-	.bind(numIteration, "iteration,i", "Specify the number of iteration")
+	.bind(numIteration, "iteration,I", "Specify the number of iteration")
+	.bind(threshold, "threshold,T", "Stop when the gain is below this threshold")
 	.bind(ratio, "ratio,r", "Specify the expected word/token ratio as the terminal condition")
 	.bind(topK, "top,t", "Process the top K bigrams per iteration")
 	.bind(outputEvery, "outputEvery", "Output temporary result every N iterations")
@@ -185,8 +187,10 @@ int main(int argc, char** argv) {
     const boost::regex word_pattern("^(" + syllable + "){1,4}$");
 
     // Now, enter the loop
+    bool quit = false;
     int iteration = 0;
-    while (++iteration) {
+
+    while (!quit && ++iteration) {
 	unsigned int N = 0;
 
 	{
@@ -312,6 +316,9 @@ int main(int argc, char** argv) {
 		    // << bigram[bs.first] << ' '
 		    // << score << "\n";
 	    }
+
+	    // quit execution later if the threshould has been reached
+	    if (score > threshold) quit = true;
 
 	    // (1) Prepare and renew the posting lists for x, y, and xy (i.e., z)
 	    int z = lexicon.encode(lexicon.decode(x) + lexicon.decode(y));
