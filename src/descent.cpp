@@ -18,23 +18,23 @@ typedef int Unigram;
 typedef std::pair<int, int> Bigram;
 
 void 
-output_segmented_text(std::ostream& out, std::vector<Unigram>& text, 
+output_segmented_text(std::ostream& out, 
+		      std::vector<Unigram>::const_iterator first,
+		      std::vector<Unigram>::const_iterator last,
 		      kinkaseki::Lexicon& lexicon, Unigram unk, Unigram eol)
 {
     bool newline = true;
-    BOOST_FOREACH (Unigram u, text) {
-	if (u == unk) continue;
 
-	if (u == eol) {
+    for (; first != last; ++first) {
+	if (*first == unk) continue;
+
+	if (*first == eol) {
 	    out << "\n";
 	    newline = true;
-	}
-	else {
-	    if (newline)
-		newline = false;
-	    else
-		out << ' ';
-	    out << lexicon.decode(u);
+	} else {
+	    if (newline) newline = false;
+	    else out << ' ';
+	    out << lexicon.decode(*first);
 	}
     }
 }
@@ -123,6 +123,7 @@ int main(int argc, char** argv) {
     vector<Unigram> text;
     kinkaseki::LineReader reader;
 
+    text.push_back(EOL);
     while (istream& line = reader.getline(cin)) {
 	string token;
 	while (line >> token) 
@@ -148,19 +149,17 @@ int main(int argc, char** argv) {
 	typedef vector<Unigram>::iterator iterator;
 
 	// Note the range: [begin, end - 1)
-	iterator first = text.begin(), last = text.end() - 1;
+	// iterator first = text.begin(), last = text.end() - 1;
+	iterator first = text.begin(), last = text.end();
 	iterator iter = first + 1;
 
 	Unigram prev = *first;
-	if (prev != EOL) unigram[prev].push_back(0);
+	unigram[prev].push_back(0);
 
 	while (iter != last) {
 	    Unigram curr = *iter;
-	    if (curr != EOL) {
-		unigram[curr].push_back(distance(first, iter));
-		if (prev != EOL)
-		    bigram[Bigram(prev, curr)]++;
-	    }
+	    unigram[curr].push_back(distance(first, iter));
+	    bigram[Bigram(prev, curr)]++;
 
 	    prev = curr;
 	    ++iter;
@@ -188,10 +187,6 @@ int main(int argc, char** argv) {
     // Now, enter the loop
     int iteration = 0;
     while (++iteration) {
-	// N denotes the total number of `regular' tokens
-	// H denotes H(W), J denotes J(W)
-	//
-	// NOTE: W stands for current support (more details later)
 	unsigned int N = 0;
 
 	{
@@ -218,12 +213,13 @@ int main(int argc, char** argv) {
 	vector<BigramScore> topBigram;
 
 	{
-	    using std::log2;
+	    // using std::log2;
+	    using std::log;
 
 	    vector<BigramScore> score;
 	    score.reserve(bigram.size());
 
-	    float log_N = log2(N);
+	    float log_N = log(N);
 	    // float average_J = J / N;
 
 	    BigramIndex::iterator iter = bigram.begin(), last = bigram.end();
@@ -261,14 +257,14 @@ int main(int argc, char** argv) {
 		// float objective = objectiveFunction(beta, f_xy, N, numTokens, delta_H, unigram.size());
 		int unigramSize_xy = unigramSize[x] + unigramSize[y];
 
-		if (unigramSize_xy >= xlogx.size()) 
+		if (static_cast<unsigned int>(unigramSize_xy) >= xlogx.size()) 
 		    die("Something's wrong.  The word is way too big");
 
 		float penalty = xlogx[unigramSize_xy] - xlogx[unigramSize[x]] - xlogx[unigramSize[y]];
 
 		float objective = 
-		    f_xy * (1 + log2(f_x * f_y / f_xy) - log_N - alpha) + 
-		    0.5 * ((W + 1) * log2(N - f_xy) - W * log_N) +
+		    f_xy * (1 + log(f_x * f_y / f_xy) - log_N - alpha) + 
+		    0.5 * ((W + 1) * log(N - f_xy) - W * log_N) +
 		    beta * f_xy * penalty;
 		    // beta * f_xy * (unigramSize_xy * log(unigramSize_xy) - 
 				   // unigramSize[x] * log(unigramSize[x]) - unigramSize[y] * log(unigramSize[y]));
@@ -299,15 +295,23 @@ int main(int argc, char** argv) {
 	    int y = bs.first.second;
 	    float score = bs.second;
 
-	    if (cli["verbose"]) 
-		cerr 
-		    << iteration << ' ' 
-		    << currentRatio << ' '
-		    << lexicon.decode(x) << lexicon.decode(y) << ' ' 
-		    << unigram[x].size() << ' '
-		    << unigram[y].size() << ' '
-		    << bigram[bs.first] << ' '
-		    << score << "\n";
+	    if (cli["verbose"]) {
+		cerr << 
+		    boost::format("%|6| %|-16| %|10|%|10.2f| %|10|") 
+		    % iteration
+		    % (lexicon.decode(x) + " " + lexicon.decode(y))
+		    % N
+		    % score
+		    % bigram[bs.first] 
+		    << '\n';
+		    // << iteration << ' ' 
+		    // << currentRatio << ' '
+		    // << lexicon.decode(x) << lexicon.decode(y) << ' ' 
+		    // << unigram[x].size() << ' '
+		    // << unigram[y].size() << ' '
+		    // << bigram[bs.first] << ' '
+		    // << score << "\n";
+	    }
 
 	    // (1) Prepare and renew the posting lists for x, y, and xy (i.e., z)
 	    int z = lexicon.encode(lexicon.decode(x) + lexicon.decode(y));
@@ -448,7 +452,7 @@ int main(int argc, char** argv) {
 
 	    cerr << boost::format("Save output to %s") % filepath << '\n';
 	    ofstream fout(filepath.c_str());
-	    output_segmented_text(fout, text, lexicon, UNK, EOL);
+	    output_segmented_text(fout, text.begin() + 1, text.end(), lexicon, UNK, EOL);
 	}
     }
 
@@ -460,7 +464,7 @@ int main(int argc, char** argv) {
 
 	cerr << boost::format("Save output to %s") % filepath << '\n';
 	ofstream fout(filepath.c_str());
-	output_segmented_text(fout, text, lexicon, UNK, EOL);
+	output_segmented_text(fout, text.begin() + 1, text.end(), lexicon, UNK, EOL);
     }
 
     return 0;
