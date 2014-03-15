@@ -13,9 +13,9 @@ int main(int argc, char** argv) {
     kinkaseki::CLI cli(argc, argv);
 
     cli
-	.bind("ignore-case,i", "Ignore case distinctions")
+	.bind("case-insensitive,i", "Ignore case distinctions")
 	.bind("verbose,v", "Show verbose output")
-	.bind("silent", "Suppress warnings")
+	.bind("silent,s", "Suppress warnings")
 	.setUsage("TRUTH-FILE TEST-FILE [TEST-FILE..]")
 	.setSynopsis("Evaluate the precision/recall of the segmented text\n")
 	.setTexts(
