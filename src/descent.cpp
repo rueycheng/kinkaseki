@@ -71,6 +71,7 @@ int main(int argc, char** argv) {
     int outputEvery = 100;
     string prefix = "output";
     string outputPath = ".";
+    bool useX2Penalty = false;
 
     cli
 	.bind("verbose,v", "Show verbose output")
@@ -85,6 +86,7 @@ int main(int argc, char** argv) {
 	.bind(outputEvery, "outputEvery", "Output temporary result every N iterations")
 	.bind(prefix, "prefix", "Prefix for the output files")
 	.bind(outputPath, "outputPath,D", "Output result to this directory")
+	.bind(useX2Penalty, "useX2Penalty", "Use X^2 penalty function")
 	// .bind(minSupport, "support,s", "Specify the minimum support")
 	// .bind(charLimit, "limit", "Specify the maximum number of characters in a word")
 	// .bind(subcharLimit, "sublimit", "Specify the maximum number of characters in a subword")
@@ -174,10 +176,13 @@ int main(int argc, char** argv) {
     }
 
     // Precompute xlogx values up to 100
-    vector<double> xlogx;
+    vector<double> xlogx, x2;
     xlogx.push_back(0); // 0 log 0 = 0
-    for (int i = 1; i <= 100; ++i)
+    x2.push_back(0); // 0^2 = 0
+    for (int i = 1; i <= 100; ++i) {
 	xlogx.push_back(i * log(i));
+	x2.push_back(i * i);
+    }
 
     // Set up regular expressions
     std::string vowel = "[#%&()*3679AEIOQRUaeilou~]";
@@ -264,7 +269,9 @@ int main(int argc, char** argv) {
 		if (static_cast<unsigned int>(unigramSize_xy) >= xlogx.size()) 
 		    die("Something's wrong.  The word is way too big");
 
-		float penalty = xlogx[unigramSize_xy] - xlogx[unigramSize[x]] - xlogx[unigramSize[y]];
+		float penalty = useX2Penalty? 
+		    (x2[unigramSize_xy] - x2[unigramSize[x]] - x2[unigramSize[y]]):
+		    (xlogx[unigramSize_xy] - xlogx[unigramSize[x]] - xlogx[unigramSize[y]]);
 
 		float objective = 
 		    f_xy * (1 + log(f_x * f_y / f_xy) - log_N - alpha) + 
