@@ -45,6 +45,9 @@ int main(int argc, char** argv) {
 	while (getline(truth, l0) && getline(test, l1)) {
 	    ++lineno;
 
+	    l0 += " ";
+	    l1 += " ";
+
 	    if (cli["ignore-case"]) {
 		boost::to_lower(l0);
 		boost::to_lower(l1);
