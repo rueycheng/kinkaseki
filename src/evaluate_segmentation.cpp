@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
 	    l0 += " ";
 	    l1 += " ";
 
-	    if (cli["ignore-case"]) {
+	    if (cli["case-insensitive"]) {
 		boost::to_lower(l0);
 		boost::to_lower(l1);
 	    }
